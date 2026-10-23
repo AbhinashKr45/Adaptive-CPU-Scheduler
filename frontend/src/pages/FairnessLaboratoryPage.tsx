@@ -5,6 +5,9 @@ import {
   Scale, Clock, RefreshCw, Info, CheckCircle,
   AlertCircle, ArrowRight, TrendingUp, Users, Play, HelpCircle
 } from 'lucide-react';
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid
+} from 'recharts';
 
 interface FairnessLaboratoryProps {
   currentProcesses: ProcessItem[];
@@ -192,6 +195,29 @@ export const FairnessLaboratoryPage: React.FC<FairnessLaboratoryProps> = ({
     }
     return topAlgo;
   }, [dynamicFairnessAtT]);
+
+  // Compute multi-point progress fairness trajectory for Recharts
+  const fairnessTrajectoryData = useMemo(() => {
+    if (!data) return [];
+    const steps = 30;
+    const stepSize = Math.max(1, Math.floor(maxMakespan / steps));
+    const points = [];
+
+    for (let t = 1; t <= maxMakespan; t += stepSize) {
+      const row: any = { time: t };
+      for (const s of schedulersList) {
+        const sim = data.results[s];
+        if (!sim || !sim.processes) continue;
+        const srvMap = computeServiceAtTime(sim, t);
+        const progVals = sim.processes
+          .filter(p => p.arrival_time <= t)
+          .map(p => (p.burst_time > 0 ? Math.min((srvMap[p.pid] || 0) / p.burst_time, 1.0) : 0));
+        row[s] = Number(computeJainsIndex(progVals).index.toFixed(4));
+      }
+      points.push(row);
+    }
+    return points;
+  }, [data, maxMakespan]);
 
   return (
     <div>
@@ -411,6 +437,36 @@ export const FairnessLaboratoryPage: React.FC<FairnessLaboratoryProps> = ({
               })}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Recharts Dynamic Progress Fairness Trajectory */}
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <div className="card-title">Progress Equity Trajectory Over Execution Time J(F, T)</div>
+            <div className="card-subtitle">
+              Continuous tracking of Jain's progress equity as execution progresses from T = 1 to makespan.
+            </div>
+          </div>
+          <span className="badge badge-blue">Recharts Continuous Curve</span>
+        </div>
+
+        <div style={{ height: 280, width: '100%', marginTop: 10 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={fairnessTrajectoryData} margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="time" stroke="var(--navy-600)" label={{ value: 'Observation Time T (ticks)', position: 'insideBottom', offset: -5, fill: 'var(--navy-500)', fontSize: 12 }} />
+              <YAxis domain={[0, 1]} stroke="var(--navy-600)" label={{ value: "Jain's J(F)", angle: -90, position: 'insideLeft', fill: 'var(--navy-500)', fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.85rem' }} />
+              <Legend wrapperStyle={{ paddingTop: 8 }} />
+              <Line type="monotone" dataKey="RR" stroke="#2563eb" strokeWidth={2.5} dot={false} name="RR (q=2)" />
+              <Line type="monotone" dataKey="SRTF" stroke="#ea580c" strokeWidth={2} dot={false} name="SRTF" />
+              <Line type="monotone" dataKey="SJF" stroke="#0d9488" strokeWidth={1.8} dot={false} name="SJF" />
+              <Line type="monotone" dataKey="FCFS" stroke="#64748b" strokeWidth={1.8} strokeDasharray="4 4" dot={false} name="FCFS" />
+              <Line type="monotone" dataKey="PRIORITY" stroke="#9333ea" strokeWidth={1.8} dot={false} name="PRIORITY" />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </div>
 

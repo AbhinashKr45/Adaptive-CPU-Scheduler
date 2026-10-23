@@ -5,6 +5,10 @@ import {
   LineChart as LineChartIcon, BarChart2, Layers,
   TrendingDown, CheckCircle, AlertCircle, ArrowRight
 } from 'lucide-react';
+import {
+  ResponsiveContainer, BarChart, Bar, ErrorBar,
+  XAxis, YAxis, Tooltip, Legend, CartesianGrid
+} from 'recharts';
 
 interface ResearchAnalyticsProps {
   activeExperiment: ExperimentItem | null;
@@ -113,86 +117,89 @@ export const ResearchAnalyticsPage: React.FC<ResearchAnalyticsProps> = ({
         )}
       </div>
 
-      {/* Chart 1: Mean Waiting Time with 95% Confidence Intervals */}
+      {/* Chart 1: Recharts Interactive BarChart with 95% Confidence Intervals */}
       <div className="card">
         <div className="card-header">
           <div>
-            <div className="card-title">Mean Waiting Time with 95% Confidence Intervals</div>
+            <div className="card-title">Mean Waiting Time with 95% Confidence Intervals (Recharts)</div>
             <div className="card-subtitle">
               Calculated via Student's t distribution over {currentExp?.seeds.length} paired seeds. Whisker lines represent [CI Low, CI High].
             </div>
           </div>
+          <span className="badge badge-blue">Interactive Recharts</span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '10px 0' }}>
-          {schedulers.map(s => {
-            const stats = summary[s]?.avg_waiting_time;
-            if (!stats) return null;
-            const meanWidthPct = (stats.mean / maxWaitMean) * 100;
-            const ciLowPct = (stats.ci_low / maxWaitMean) * 100;
-            const ciHighPct = (stats.ci_high / maxWaitMean) * 100;
+        <div style={{ height: 320, width: '100%', marginTop: 10 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={schedulers.map(s => {
+                const stats = summary[s]?.avg_waiting_time || {};
+                const ciRange = stats.ci_high && stats.ci_low ? [stats.mean - stats.ci_low, stats.ci_high - stats.mean] : undefined;
+                return {
+                  name: s,
+                  waiting_time: stats.mean || 0,
+                  ci_low: stats.ci_low,
+                  ci_high: stats.ci_high,
+                  error: ciRange
+                };
+              })}
+              margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="name" stroke="var(--navy-600)" />
+              <YAxis stroke="var(--navy-600)" label={{ value: 'Ticks', angle: -90, position: 'insideLeft', fill: 'var(--navy-500)' }} />
+              <Tooltip
+                contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.85rem' }}
+                formatter={(val: any, name: any, item: any) => [
+                  `${Number(val).toFixed(2)} ticks (95% CI: [${item.payload.ci_low?.toFixed(2)}, ${item.payload.ci_high?.toFixed(2)}])`,
+                  'Avg Waiting Time'
+                ]}
+              />
+              <Bar dataKey="waiting_time" fill="#2563eb" radius={[6, 6, 0, 0]}>
+                <ErrorBar dataKey="error" width={4} strokeWidth={2} stroke="#ea580c" />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
 
-            return (
-              <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <div style={{ width: 100, fontWeight: 600, fontSize: '0.85rem' }}>{s}</div>
-                <div style={{ flex: 1, position: 'relative', height: 32, background: 'var(--surface-secondary)', borderRadius: 6, display: 'flex', alignItems: 'center' }}>
-                  {/* CI Range line */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: `${ciLowPct}%`,
-                      width: `${Math.max(2, ciHighPct - ciLowPct)}%`,
-                      height: 4,
-                      background: 'var(--navy-400)',
-                      borderRadius: 2
-                    }}
-                  />
-                  {/* CI low whisker */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: `${ciLowPct}%`,
-                      height: 12,
-                      width: 2,
-                      background: 'var(--navy-600)'
-                    }}
-                  />
-                  {/* CI high whisker */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: `${ciHighPct}%`,
-                      height: 12,
-                      width: 2,
-                      background: 'var(--navy-600)'
-                    }}
-                  />
-                  {/* Mean Bar */}
-                  <div
-                    style={{
-                      width: `${meanWidthPct}%`,
-                      height: '100%',
-                      background: s === 'SRTF' || s === 'SJF' ? 'var(--blue-600)' : 'var(--navy-700)',
-                      borderRadius: 4,
-                      opacity: 0.85,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'flex-end',
-                      paddingRight: 8,
-                      color: '#fff',
-                      fontSize: '0.75rem',
-                      fontWeight: 600
-                    }}
-                  >
-                    {stats.mean.toFixed(2)}
-                  </div>
-                </div>
-                <div style={{ width: 140, fontSize: '0.75rem', color: 'var(--navy-600)' }}>
-                  CI: [{stats.ci_low.toFixed(2)}, {stats.ci_high.toFixed(2)}]
-                </div>
-              </div>
-            );
-          })}
+      {/* Chart 2: Recharts Multi-Metric Comparative Performance */}
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <div className="card-title">Comparative Latency & Overhead Breakdown</div>
+            <div className="card-subtitle">
+              Side-by-side grouped evaluation of Waiting Time, Response Time, and Context Switches across all policies.
+            </div>
+          </div>
+          <span className="badge badge-purple">Grouped Comparison</span>
+        </div>
+
+        <div style={{ height: 320, width: '100%', marginTop: 10 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={schedulers.map(s => ({
+                name: s,
+                'Waiting Time': summary[s]?.avg_waiting_time?.mean || 0,
+                'Response Time': summary[s]?.avg_response_time?.mean || 0,
+                'Turnaround': summary[s]?.avg_turnaround_time?.mean || 0,
+                'Context Switches': summary[s]?.context_switches?.mean || 0
+              }))}
+              margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="name" stroke="var(--navy-600)" />
+              <YAxis stroke="var(--navy-600)" />
+              <Tooltip
+                contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.85rem' }}
+              />
+              <Legend wrapperStyle={{ paddingTop: 10 }} />
+              <Bar dataKey="Waiting Time" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Response Time" fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Turnaround" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Context Switches" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
