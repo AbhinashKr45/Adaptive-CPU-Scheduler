@@ -202,12 +202,123 @@ static int test_observation_time_fairness(void) {
     return 0;
 }
 
+static int test_fairness_and_starvation_metrics_hand_worked(void) {
+    /* Hand-worked example with 3 processes under FCFS:
+       P1: arrival=0, burst=4 -> start=0, completion=4, wait=0, response=0
+       P2: arrival=0, burst=4 -> start=4, completion=8, wait=4, response=4
+       P3: arrival=0, burst=4 -> start=8, completion=12, wait=8, response=8
+
+       Waiting times: w = [0, 4, 8]
+       Mean waiting time = (0 + 4 + 8) / 3 = 12 / 3 = 4.0
+       Median waiting time = 4.0
+       Max waiting time = 8
+       Max response time = 8
+
+       Waiting time std (population standard deviation):
+       mean = 4.0
+       sum_sq_diff = (0-4)^2 + (4-4)^2 + (8-4)^2 = 16 + 0 + 16 = 32
+       variance = 32 / 3 = 10.666667
+       std = sqrt(32/3) approx 3.265986
+
+       p95 waiting time (linear interpolation, rank = (3-1) * 0.95 = 1.90):
+       lower = 1, fraction = 0.90
+       p95 = w[1] + 0.90 * (w[2] - w[1]) = 4 + 0.90 * (8 - 4) = 4 + 3.6 = 7.60
+
+       Waiting time Gini coefficient:
+       Sorted w = [0, 4, 8], n = 3, sum = 12
+       Pairwise diff sum = |0-0| + |0-4| + |0-8| + |4-0| + |4-4| + |4-8| + |8-0| + |8-4| + |8-8|
+                         = 0 + 4 + 8 + 4 + 0 + 4 + 8 + 4 + 0 = 32
+       Denominator = 2 * n * sum = 2 * 3 * 12 = 72
+       Gini = 32 / 72 = 4 / 9 approx 0.444444
+
+       Starvation count (default 3x mean = 3 * 4.0 = 12.0):
+       None of [0, 4, 8] exceed 12.0, so starvation_count = 0.
+    */
+    Process procs[3];
+    procs[0] = process_create(1, 0, 4, 1);
+    procs[1] = process_create(2, 0, 4, 1);
+    procs[2] = process_create(3, 0, 4, 1);
+
+    Scheduler fcfs = create_fcfs_scheduler();
+    SimulationResult res;
+    int status = simulation_run_detailed(procs, 3, fcfs, &res);
+    if (status != 0) {
+        printf("FAIL: Simulation failed in hand-worked test\n");
+        return 1;
+    }
+
+    if (fabs(res.metrics.avg_waiting_time - 4.0) > 1e-5) {
+        printf("FAIL: Avg wait expected 4.0, got %f\n", res.metrics.avg_waiting_time);
+        simulation_result_free(&res);
+        return 1;
+    }
+    if (res.metrics.max_waiting_time != 8) {
+        printf("FAIL: Max wait expected 8, got %d\n", res.metrics.max_waiting_time);
+        simulation_result_free(&res);
+        return 1;
+    }
+    if (res.metrics.max_response_time != 8) {
+        printf("FAIL: Max response expected 8, got %d\n", res.metrics.max_response_time);
+        simulation_result_free(&res);
+        return 1;
+    }
+    double expected_std = sqrt(32.0 / 3.0);
+    if (fabs(res.metrics.waiting_time_std - expected_std) > 1e-5) {
+        printf("FAIL: Waiting time std expected %f, got %f\n", expected_std, res.metrics.waiting_time_std);
+        simulation_result_free(&res);
+        return 1;
+    }
+    if (fabs(res.metrics.p95_waiting_time - 7.6) > 1e-5) {
+        printf("FAIL: p95 wait expected 7.6, got %f\n", res.metrics.p95_waiting_time);
+        simulation_result_free(&res);
+        return 1;
+    }
+    double expected_gini = 4.0 / 9.0;
+    if (fabs(res.metrics.waiting_time_gini - expected_gini) > 1e-5) {
+        printf("FAIL: Gini expected %f, got %f\n", expected_gini, res.metrics.waiting_time_gini);
+        simulation_result_free(&res);
+        return 1;
+    }
+    if (res.metrics.starvation_count != 0) {
+        printf("FAIL: Starvation count expected 0, got %d\n", res.metrics.starvation_count);
+        simulation_result_free(&res);
+        return 1;
+    }
+    simulation_result_free(&res);
+
+    /* Second hand-worked case: test starvation count with a skewed workload.
+       5 processes with waiting times: [1, 1, 1, 1, 20]
+       Mean waiting time = 24 / 5 = 4.8
+       Starvation threshold (3x) = 14.4
+       Process with wait=20 exceeds 14.4 -> starvation_count should be 1.
+    */
+    Process procs_starve[5];
+    for (int i = 0; i < 5; i++) {
+        procs_starve[i] = process_create(i + 1, 0, 1, 1);
+    }
+    procs_starve[0].waiting_time = 1;
+    procs_starve[1].waiting_time = 1;
+    procs_starve[2].waiting_time = 1;
+    procs_starve[3].waiting_time = 1;
+    procs_starve[4].waiting_time = 20;
+
+    int starve_count = metrics_calculate_starvation_count(procs_starve, 5, 4.8, 3.0);
+    if (starve_count != 1) {
+        printf("FAIL: Expected starvation count 1, got %d\n", starve_count);
+        return 1;
+    }
+
+    printf("PASS: Hand-worked Gini, p95, std, and starvation metrics test\n");
+    return 0;
+}
+
 int main(void) {
     if (test_jains_index_hand_worked() != 0) return 1;
     if (test_demand_relative_progress_fairness() != 0) return 1;
     if (test_process_metrics_definitions() != 0) return 1;
     if (test_aggregate_metrics_conservation() != 0) return 1;
     if (test_observation_time_fairness() != 0) return 1;
+    if (test_fairness_and_starvation_metrics_hand_worked() != 0) return 1;
 
     printf("\nPASS: All metrics and fairness tests\n");
     return 0;

@@ -329,6 +329,7 @@ def run_experiment_batch(
 
     paired_metrics = [
         "avg_waiting_time", "avg_turnaround_time", "avg_response_time",
+        "p95_waiting_time", "waiting_time_std", "starvation_count", "waiting_time_gini",
         "jain_fairness_cpu", "jain_fairness_progress",
         "context_switches", "throughput"
     ]

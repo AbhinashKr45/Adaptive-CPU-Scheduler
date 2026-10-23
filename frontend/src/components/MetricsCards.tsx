@@ -13,7 +13,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ metrics }) => {
         <div className="stat-label">Avg Waiting Time</div>
         <div className="stat-value">{metrics.avg_waiting_time.toFixed(2)}</div>
         <div className="stat-sub">
-          Median: {metrics.median_waiting_time.toFixed(2)} | Max: {metrics.max_waiting_time}
+          p95: {metrics.p95_waiting_time !== undefined ? metrics.p95_waiting_time.toFixed(2) : '-'} | σ: {metrics.waiting_time_std !== undefined ? metrics.waiting_time_std.toFixed(2) : '-'} | Max: {metrics.max_waiting_time}
         </div>
       </div>
 
@@ -31,7 +31,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ metrics }) => {
         <div className="stat-label">Avg Response Time</div>
         <div className="stat-value">{metrics.avg_response_time.toFixed(2)}</div>
         <div className="stat-sub">
-          Median: {metrics.median_response_time.toFixed(2)}
+          Median: {metrics.median_response_time.toFixed(2)} | Max: {metrics.max_response_time ?? '-'}
         </div>
       </div>
 
@@ -62,22 +62,26 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ metrics }) => {
         <div className="stat-sub">Raw service equality (0 to 1.0)</div>
       </div>
 
-      {/* Progress Fairness */}
+      {/* Progress Fairness & Gini */}
       <div className="stat-card">
-        <div className="stat-label">Progress Fairness</div>
+        <div className="stat-label">Fairness & Inequality</div>
         <div className="stat-value" style={{ color: metrics.jain_fairness_progress > 0.85 ? 'var(--green-600)' : 'var(--navy-900)' }}>
-          {metrics.is_progress_fairness_defined ? metrics.jain_fairness_progress.toFixed(4) : 'N/A'}
+          J(F): {metrics.is_progress_fairness_defined ? metrics.jain_fairness_progress.toFixed(3) : 'N/A'}
         </div>
-        <div className="stat-sub">Demand-relative progress (0 to 1.0)</div>
+        <div className="stat-sub">
+          Waiting Gini: {metrics.waiting_time_gini !== undefined ? metrics.waiting_time_gini.toFixed(4) : '-'} (0 = equal)
+        </div>
       </div>
 
-      {/* Starvation Ratio */}
+      {/* Starvation Ratio & Count */}
       <div className="stat-card">
-        <div className="stat-label">Starvation Indicator</div>
-        <div className="stat-value" style={{ color: metrics.starvation_ratio > 3.0 ? 'var(--red-600)' : 'var(--navy-900)' }}>
+        <div className="stat-label">Starvation Indicators</div>
+        <div className="stat-value" style={{ color: (metrics.starvation_count > 0 || metrics.starvation_ratio > 3.0) ? 'var(--red-600)' : 'var(--navy-900)' }}>
           {metrics.starvation_ratio.toFixed(2)}x
         </div>
-        <div className="stat-sub">Max Wait / Avg Wait ratio</div>
+        <div className="stat-sub">
+          Starved procs (&gt;3x avg): <strong>{metrics.starvation_count ?? 0}</strong>
+        </div>
       </div>
     </div>
   );

@@ -92,6 +92,7 @@ int main(int argc, char *argv[]) {
     int quantum = 2;
     const char *input_file = NULL;
     const char *observe_times_str = NULL;
+    double starvation_mult = DEFAULT_STARVATION_MULTIPLIER;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--algorithm") == 0 && i + 1 < argc) {
@@ -102,8 +103,10 @@ int main(int argc, char *argv[]) {
             input_file = argv[++i];
         } else if (strcmp(argv[i], "--observe-times") == 0 && i + 1 < argc) {
             observe_times_str = argv[++i];
+        } else if (strcmp(argv[i], "--starvation-mult") == 0 && i + 1 < argc) {
+            starvation_mult = atof(argv[++i]);
         } else if (strcmp(argv[i], "--help") == 0) {
-            printf("Usage: %s [--algorithm FCFS|SJF|SRTF|PRIORITY|RR] [--quantum Q] [--input FILE] [--observe-times T1,T2,...]\n", argv[0]);
+            printf("Usage: %s [--algorithm FCFS|SJF|SRTF|PRIORITY|RR] [--quantum Q] [--input FILE] [--observe-times T1,T2,...] [--starvation-mult M]\n", argv[0]);
             return 0;
         }
     }
@@ -192,6 +195,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    if (starvation_mult > 0.0) {
+        res.metrics.starvation_count = metrics_calculate_starvation_count(
+            res.processes, res.process_count, res.metrics.avg_waiting_time, starvation_mult
+        );
+    }
+
     /* Output JSON */
     printf("{\n");
     printf("  \"status\": \"success\",\n");
@@ -201,10 +210,13 @@ int main(int argc, char *argv[]) {
     printf("    \"avg_waiting_time\": %.4f,\n", res.metrics.avg_waiting_time);
     printf("    \"median_waiting_time\": %.4f,\n", res.metrics.median_waiting_time);
     printf("    \"max_waiting_time\": %d,\n", res.metrics.max_waiting_time);
+    printf("    \"p95_waiting_time\": %.4f,\n", res.metrics.p95_waiting_time);
+    printf("    \"waiting_time_std\": %.4f,\n", res.metrics.waiting_time_std);
     printf("    \"avg_turnaround_time\": %.4f,\n", res.metrics.avg_turnaround_time);
     printf("    \"median_turnaround_time\": %.4f,\n", res.metrics.median_turnaround_time);
     printf("    \"avg_response_time\": %.4f,\n", res.metrics.avg_response_time);
     printf("    \"median_response_time\": %.4f,\n", res.metrics.median_response_time);
+    printf("    \"max_response_time\": %d,\n", res.metrics.max_response_time);
     printf("    \"throughput\": %.6f,\n", res.metrics.throughput);
     printf("    \"cpu_utilization\": %.6f,\n", res.metrics.cpu_utilization);
     printf("    \"total_busy_time\": %d,\n", res.metrics.total_busy_time);
@@ -213,6 +225,8 @@ int main(int argc, char *argv[]) {
     printf("    \"context_switches\": %d,\n", res.metrics.context_switches);
     printf("    \"preemptions\": %d,\n", res.metrics.preemptions);
     printf("    \"starvation_ratio\": %.4f,\n", res.metrics.starvation_ratio);
+    printf("    \"starvation_count\": %d,\n", res.metrics.starvation_count);
+    printf("    \"waiting_time_gini\": %.6f,\n", res.metrics.waiting_time_gini);
     printf("    \"jain_fairness_cpu\": %.6f,\n", res.metrics.jain_fairness_cpu);
     printf("    \"jain_fairness_progress\": %.6f,\n", res.metrics.jain_fairness_progress);
     printf("    \"is_cpu_fairness_defined\": %s,\n", res.metrics.is_cpu_fairness_defined ? "true" : "false");

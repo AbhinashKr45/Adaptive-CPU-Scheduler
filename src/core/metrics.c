@@ -72,7 +72,69 @@ static double calculate_median(double array[], int n) {
     }
 }
 
-void metrics_calculate_aggregate(
+double metrics_calculate_p95(const double sorted_array[], int n) {
+    if (sorted_array == NULL || n <= 0) return 0.0;
+    if (n == 1) return sorted_array[0];
+
+    double rank = (double)(n - 1) * 0.95;
+    int lower = (int)floor(rank);
+    double frac = rank - (double)lower;
+
+    if (lower >= n - 1) {
+        return sorted_array[n - 1];
+    }
+    return sorted_array[lower] + frac * (sorted_array[lower + 1] - sorted_array[lower]);
+}
+
+double metrics_calculate_std(const double array[], int n, double mean) {
+    if (array == NULL || n <= 1) return 0.0;
+
+    double sum_sq_diff = 0.0;
+    for (int i = 0; i < n; i++) {
+        double diff = array[i] - mean;
+        sum_sq_diff += diff * diff;
+    }
+    return sqrt(sum_sq_diff / (double)n);
+}
+
+double metrics_calculate_gini(const double sorted_array[], int n) {
+    if (sorted_array == NULL || n <= 1) return 0.0;
+
+    double sum = 0.0;
+    for (int i = 0; i < n; i++) {
+        sum += (sorted_array[i] < 0.0 ? 0.0 : sorted_array[i]);
+    }
+
+    if (sum <= 1e-12) {
+        return 0.0; /* Perfect equality when all values are 0 */
+    }
+
+    double weighted_sum = 0.0;
+    for (int i = 0; i < n; i++) {
+        double v = sorted_array[i] < 0.0 ? 0.0 : sorted_array[i];
+        weighted_sum += (double)(i + 1) * v;
+    }
+
+    double gini = (2.0 * weighted_sum) / ((double)n * sum) - ((double)(n + 1) / (double)n);
+    if (gini < 0.0) gini = 0.0;
+    if (gini > 1.0) gini = 1.0;
+    return gini;
+}
+
+int metrics_calculate_starvation_count(const Process processes[], int n, double avg_waiting, double multiplier) {
+    if (processes == NULL || n <= 0 || avg_waiting <= 1e-9) return 0;
+
+    double threshold = multiplier * avg_waiting;
+    int count = 0;
+    for (int i = 0; i < n; i++) {
+        if ((double)processes[i].waiting_time > threshold) {
+            count++;
+        }
+    }
+    return count;
+}
+
+void metrics_calculate_aggregate_ex(
     Process processes[],
     int process_count,
     int total_busy_time,
@@ -80,6 +142,7 @@ void metrics_calculate_aggregate(
     int makespan,
     int context_switches,
     int preemptions,
+    double starvation_multiplier,
     AggregateMetrics *out_metrics
 ) {
     if (out_metrics == NULL) {
@@ -90,10 +153,13 @@ void metrics_calculate_aggregate(
         out_metrics->avg_waiting_time = 0.0;
         out_metrics->median_waiting_time = 0.0;
         out_metrics->max_waiting_time = 0;
+        out_metrics->p95_waiting_time = 0.0;
+        out_metrics->waiting_time_std = 0.0;
         out_metrics->avg_turnaround_time = 0.0;
         out_metrics->median_turnaround_time = 0.0;
         out_metrics->avg_response_time = 0.0;
         out_metrics->median_response_time = 0.0;
+        out_metrics->max_response_time = 0;
         out_metrics->throughput = 0.0;
         out_metrics->cpu_utilization = 0.0;
         out_metrics->total_busy_time = total_busy_time;
@@ -102,6 +168,8 @@ void metrics_calculate_aggregate(
         out_metrics->context_switches = context_switches;
         out_metrics->preemptions = preemptions;
         out_metrics->starvation_ratio = 1.0;
+        out_metrics->starvation_count = 0;
+        out_metrics->waiting_time_gini = 0.0;
         out_metrics->jain_fairness_cpu = 0.0;
         out_metrics->jain_fairness_progress = 0.0;
         out_metrics->is_cpu_fairness_defined = 0;
@@ -113,6 +181,7 @@ void metrics_calculate_aggregate(
     double total_turnaround = 0.0;
     double total_response = 0.0;
     int max_waiting = 0;
+    int max_response = 0;
 
     double *waiting_arr = malloc(sizeof(double) * process_count);
     double *turnaround_arr = malloc(sizeof(double) * process_count);
@@ -135,6 +204,10 @@ void metrics_calculate_aggregate(
             max_waiting = processes[i].waiting_time;
         }
 
+        if (processes[i].response_time > max_response) {
+            max_response = processes[i].response_time;
+        }
+
         if (waiting_arr) waiting_arr[i] = w;
         if (turnaround_arr) turnaround_arr[i] = tat;
         if (response_arr) response_arr[i] = resp;
@@ -153,12 +226,20 @@ void metrics_calculate_aggregate(
     out_metrics->avg_turnaround_time = total_turnaround / process_count;
     out_metrics->avg_response_time = total_response / process_count;
     out_metrics->max_waiting_time = max_waiting;
+    out_metrics->max_response_time = max_response;
 
     if (waiting_arr) {
+        out_metrics->waiting_time_std = metrics_calculate_std(waiting_arr, process_count, out_metrics->avg_waiting_time);
         out_metrics->median_waiting_time = calculate_median(waiting_arr, process_count);
+        /* waiting_arr is now sorted in non-descending order by calculate_median */
+        out_metrics->p95_waiting_time = metrics_calculate_p95(waiting_arr, process_count);
+        out_metrics->waiting_time_gini = metrics_calculate_gini(waiting_arr, process_count);
         free(waiting_arr);
     } else {
+        out_metrics->waiting_time_std = 0.0;
         out_metrics->median_waiting_time = out_metrics->avg_waiting_time;
+        out_metrics->p95_waiting_time = out_metrics->avg_waiting_time;
+        out_metrics->waiting_time_gini = 0.0;
     }
 
     if (turnaround_arr) {
@@ -195,6 +276,10 @@ void metrics_calculate_aggregate(
         out_metrics->starvation_ratio = 1.0;
     }
 
+    out_metrics->starvation_count = metrics_calculate_starvation_count(
+        processes, process_count, out_metrics->avg_waiting_time, starvation_multiplier
+    );
+
     if (cpu_alloc_arr) {
         out_metrics->jain_fairness_cpu = metrics_calculate_jains_index(
             cpu_alloc_arr, process_count, &out_metrics->is_cpu_fairness_defined
@@ -214,4 +299,27 @@ void metrics_calculate_aggregate(
         out_metrics->jain_fairness_progress = 0.0;
         out_metrics->is_progress_fairness_defined = 0;
     }
+}
+
+void metrics_calculate_aggregate(
+    Process processes[],
+    int process_count,
+    int total_busy_time,
+    int total_idle_time,
+    int makespan,
+    int context_switches,
+    int preemptions,
+    AggregateMetrics *out_metrics
+) {
+    metrics_calculate_aggregate_ex(
+        processes,
+        process_count,
+        total_busy_time,
+        total_idle_time,
+        makespan,
+        context_switches,
+        preemptions,
+        DEFAULT_STARVATION_MULTIPLIER,
+        out_metrics
+    );
 }

@@ -25,10 +25,13 @@ export interface AggregateMetricsItem {
   avg_waiting_time: number;
   median_waiting_time: number;
   max_waiting_time: number;
+  p95_waiting_time: number;
+  waiting_time_std: number;
   avg_turnaround_time: number;
   median_turnaround_time: number;
   avg_response_time: number;
   median_response_time: number;
+  max_response_time: number;
   throughput: number;
   cpu_utilization: number;
   total_busy_time: number;
@@ -37,6 +40,8 @@ export interface AggregateMetricsItem {
   context_switches: number;
   preemptions: number;
   starvation_ratio: number;
+  starvation_count: number;
+  waiting_time_gini: number;
   jain_fairness_cpu: number;
   jain_fairness_progress: number;
   is_cpu_fairness_defined: boolean;

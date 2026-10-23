@@ -28,10 +28,13 @@ class AggregateMetricsItem(BaseModel):
     avg_waiting_time: float
     median_waiting_time: float
     max_waiting_time: int
+    p95_waiting_time: float
+    waiting_time_std: float
     avg_turnaround_time: float
     median_turnaround_time: float
     avg_response_time: float
     median_response_time: float
+    max_response_time: int
     throughput: float
     cpu_utilization: float
     total_busy_time: int
@@ -40,6 +43,8 @@ class AggregateMetricsItem(BaseModel):
     context_switches: int
     preemptions: int
     starvation_ratio: float
+    starvation_count: int
+    waiting_time_gini: float
     jain_fairness_cpu: float
     jain_fairness_progress: float
     is_cpu_fairness_defined: bool

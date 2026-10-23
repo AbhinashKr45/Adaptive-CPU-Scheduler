@@ -112,8 +112,8 @@ def main():
     exp_id = exp_data["id"]
     print(f"  Batch experiment completed ({exp_data['total_runs']} runs). ID: {exp_id}")
 
-    # 7. Calculate both fairness measures
-    print("\n[Step 7] Calculating and validating both Jain's fairness measures...")
+    # 7. Calculate both fairness measures and Phase 2 metrics
+    print("\n[Step 7] Calculating and validating fairness, Gini, p95, std, and starvation measures...")
     rr_metrics = sim_results["RR"]["metrics"]
     jain_cpu = rr_metrics["jain_fairness_cpu"]
     jain_prog = rr_metrics["jain_fairness_progress"]
@@ -121,8 +121,24 @@ def main():
     assert 0.0 <= jain_prog <= 1.0, f"Invalid Jain's Progress fairness: {jain_prog}"
     assert rr_metrics["is_cpu_fairness_defined"] is True
     assert rr_metrics["is_progress_fairness_defined"] is True
+
+    # Phase 2 metrics validation
+    assert "p95_waiting_time" in rr_metrics, "p95_waiting_time missing from metrics"
+    assert "waiting_time_std" in rr_metrics, "waiting_time_std missing from metrics"
+    assert "max_response_time" in rr_metrics, "max_response_time missing from metrics"
+    assert "starvation_count" in rr_metrics, "starvation_count missing from metrics"
+    assert "waiting_time_gini" in rr_metrics, "waiting_time_gini missing from metrics"
+
+    assert rr_metrics["p95_waiting_time"] >= 0.0
+    assert rr_metrics["waiting_time_std"] >= 0.0
+    assert rr_metrics["max_response_time"] >= 0
+    assert rr_metrics["starvation_count"] >= 0
+    assert 0.0 <= rr_metrics["waiting_time_gini"] <= 1.0
+
     print(f"  RR Raw CPU Allocation Fairness J(x) = {jain_cpu:.4f}")
     print(f"  RR Demand-Relative Progress Fairness J(F) = {jain_prog:.4f}")
+    print(f"  RR Waiting Time Gini = {rr_metrics['waiting_time_gini']:.4f}, p95 = {rr_metrics['p95_waiting_time']:.2f}, std = {rr_metrics['waiting_time_std']:.2f}")
+    print(f"  RR Max Response Time = {rr_metrics['max_response_time']}, Starvation Count = {rr_metrics['starvation_count']}")
 
     # 8. Generate an adaptive recommendation
     print("\n[Step 8] Generating explainable adaptive recommendation...")

@@ -245,11 +245,29 @@ def run_simulation(req: SimulationRequest, persist: bool = Query(True), db: Sess
         raise HTTPException(status_code=400, detail=str(e))
 
     if persist:
+        m = res.get("metrics", {})
         sim_run = SimulationRun(
             workload_id=req.workload_id,
             workload_name=req.workload_name or "Workload",
             algorithm=res["algorithm"],
             quantum=res["quantum"],
+            avg_waiting_time=m.get("avg_waiting_time"),
+            median_waiting_time=m.get("median_waiting_time"),
+            max_waiting_time=m.get("max_waiting_time"),
+            p95_waiting_time=m.get("p95_waiting_time"),
+            waiting_time_std=m.get("waiting_time_std"),
+            avg_turnaround_time=m.get("avg_turnaround_time"),
+            avg_response_time=m.get("avg_response_time"),
+            max_response_time=m.get("max_response_time"),
+            throughput=m.get("throughput"),
+            cpu_utilization=m.get("cpu_utilization"),
+            makespan=m.get("makespan"),
+            context_switches=m.get("context_switches"),
+            preemptions=m.get("preemptions"),
+            starvation_count=m.get("starvation_count"),
+            waiting_time_gini=m.get("waiting_time_gini"),
+            jain_fairness_cpu=m.get("jain_fairness_cpu"),
+            jain_fairness_progress=m.get("jain_fairness_progress"),
             metrics_json=json.dumps(res["metrics"]),
             trace_json=json.dumps(res["trace"]),
             processes_json=json.dumps(res["processes"])
