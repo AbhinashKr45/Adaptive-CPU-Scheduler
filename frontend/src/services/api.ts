@@ -214,5 +214,16 @@ export const api = {
       body: JSON.stringify(req)
     });
     return handleResponse<any>(res);
+  },
+
+  // Final Benchmark Matrix & Research Report
+  async getFinalResults(): Promise<any> {
+    const res = await fetch(`${API_BASE}/final-results`);
+    return handleResponse<any>(res);
+  },
+
+  async getFinalReport(): Promise<{ report_markdown: string }> {
+    const res = await fetch(`${API_BASE}/final-results/report`);
+    return handleResponse<{ report_markdown: string }>(res);
   }
 };

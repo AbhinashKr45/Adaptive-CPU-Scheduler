@@ -11,6 +11,7 @@ import { ResearchAnalyticsPage } from './pages/ResearchAnalyticsPage';
 import { AdaptiveRecommendationPage } from './pages/AdaptiveRecommendationPage';
 import { ExperimentHistoryPage } from './pages/ExperimentHistoryPage';
 import { MethodologyGuidePage } from './pages/MethodologyGuidePage';
+import { FinalResultsPage } from './pages/FinalResultsPage';
 import { ProcessItem, ExperimentItem } from './types';
 
 // Default initial workload
@@ -109,6 +110,10 @@ export function App() {
             onLoadWorkload={handleLoadWorkload}
             onNavigate={handleNavigate}
           />
+        )}
+
+        {activeTab === 'final-results' && (
+          <FinalResultsPage onNavigate={handleNavigate} />
         )}
 
         {activeTab === 'guide' && (

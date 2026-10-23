@@ -240,3 +240,21 @@ def test_trace_api_endpoints():
     assert "comparison_stats" in comp_data
     assert comp_data["best_composite_distance"] >= 0.0
 
+
+def test_final_results_api():
+    """Validates that final results JSON and REPORT.md can be retrieved via the API."""
+    res = client.get("/api/v1/final-results")
+    assert res.status_code == 200
+    data = res.json()
+    assert "summaries" in data
+    assert "pairwise" in data
+    assert "friedman" in data
+    assert "quantum_sweep" in data
+    assert "adaptive_regret" in data
+
+    rep_res = client.get("/api/v1/final-results/report")
+    assert rep_res.status_code == 200
+    assert "report_markdown" in rep_res.json()
+    assert len(rep_res.json()["report_markdown"]) > 500
+
+

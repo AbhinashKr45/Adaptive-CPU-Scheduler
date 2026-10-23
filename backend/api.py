@@ -782,3 +782,28 @@ def compare_trace_with_synthetic(trace_id: int, req: TraceCompareSyntheticReques
         synthetic_processes=[ProcessItem(**p) for p in fit_result["best_synthetic_processes"]]
     )
 
+
+# ==========================================
+# FINAL EXPERIMENT MATRIX & RESEARCH REPORT
+# ==========================================
+
+@app.get("/api/v1/final-results")
+def get_final_results():
+    """Returns the full benchmark experiment matrix JSON results."""
+    json_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results", "experiments_results.json"))
+    if not os.path.exists(json_path):
+        raise HTTPException(status_code=404, detail="Benchmark results not found. Run backend/run_final_experiments.py first.")
+    with open(json_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+@app.get("/api/v1/final-results/report")
+def get_final_report():
+    """Returns the generated academic research markdown report (REPORT.md)."""
+    report_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results", "REPORT.md"))
+    if not os.path.exists(report_path):
+        raise HTTPException(status_code=404, detail="Research report not found. Run backend/run_final_experiments.py first.")
+    with open(report_path, "r", encoding="utf-8") as f:
+        return {"report_markdown": f.read()}
+
+
