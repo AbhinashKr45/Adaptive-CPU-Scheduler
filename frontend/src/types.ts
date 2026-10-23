@@ -122,10 +122,24 @@ export interface ExperimentSummaryStats {
 export interface PairedComparisonStats {
   n: number;
   mean_diff: number;
+  cohens_dz?: number;
   cohens_d: number;
+  hedges_g?: number;
+  ci_diff_low?: number;
+  ci_diff_high?: number;
   p_value_ttest: number;
   p_value_wilcoxon: number;
+  significant_uncorrected?: boolean;
+  significant_holm?: boolean;
   significant_at_05: boolean;
+  note?: string;
+  holm_bonferroni?: {
+    original_p: number;
+    adjusted_p: number;
+    significant_holm: boolean;
+    rank: number;
+  };
+  friedman_omnibus_significant?: boolean;
 }
 
 export interface ExperimentItem {

@@ -212,12 +212,12 @@ export const ResearchAnalyticsPage: React.FC<ResearchAnalyticsProps> = ({
             <thead>
               <tr>
                 <th>Comparison</th>
-                <th>Metric</th>
-                <th>Mean Paired Difference (Δ)</th>
-                <th>Cohen's d Effect Size</th>
-                <th>t-test p-value</th>
-                <th>Wilcoxon p-value</th>
-                <th>Significance (α=0.05)</th>
+                <th>Sample (n)</th>
+                <th>Mean Paired Diff (95% Bootstrap CI)</th>
+                <th>Effect Size (Paired d_z / Hedges' g)</th>
+                <th>t-test p (uncorr.)</th>
+                <th>Holm Adjusted p</th>
+                <th>Headline Significance (Holm α=0.05)</th>
               </tr>
             </thead>
             <tbody>
@@ -225,30 +225,49 @@ export const ResearchAnalyticsPage: React.FC<ResearchAnalyticsProps> = ({
                 const waitComp = metricsMap['avg_waiting_time'];
                 if (!waitComp) return null;
 
-                const isSig = waitComp.significant_at_05;
-                const d = waitComp.cohens_d;
+                const isSigHolm = waitComp.significant_holm ?? waitComp.holm_bonferroni?.significant_holm ?? false;
+                const isSigUncorr = waitComp.significant_uncorrected ?? waitComp.significant_at_05;
+                const dz = waitComp.cohens_dz ?? waitComp.cohens_d;
+                const g = waitComp.hedges_g ?? dz;
                 let effectDesc = 'Negligible';
-                if (Math.abs(d) >= 0.8) effectDesc = 'Large';
-                else if (Math.abs(d) >= 0.5) effectDesc = 'Medium';
-                else if (Math.abs(d) >= 0.2) effectDesc = 'Small';
+                if (Math.abs(dz) >= 0.8) effectDesc = 'Large';
+                else if (Math.abs(dz) >= 0.5) effectDesc = 'Medium';
+                else if (Math.abs(dz) >= 0.2) effectDesc = 'Small';
+
+                const adjP = waitComp.holm_bonferroni?.adjusted_p;
+                const ciLow = waitComp.ci_diff_low ?? waitComp.mean_diff;
+                const ciHigh = waitComp.ci_diff_high ?? waitComp.mean_diff;
 
                 return (
                   <tr key={compName}>
                     <td><strong>{compName.replace(/_/g, ' ')}</strong></td>
-                    <td>Avg Waiting Time</td>
+                    <td><span className="badge badge-gray">{waitComp.n ?? 'N/A'}</span></td>
                     <td style={{ color: waitComp.mean_diff < 0 ? 'var(--green-600)' : 'var(--red-600)', fontWeight: 600 }}>
                       {waitComp.mean_diff.toFixed(2)} ticks
+                      <div style={{ fontSize: '0.75rem', color: 'var(--navy-500)', fontWeight: 400 }}>
+                        95% CI: [{ciLow.toFixed(2)}, {ciHigh.toFixed(2)}]
+                      </div>
                     </td>
                     <td>
-                      <strong>{waitComp.cohens_d.toFixed(2)}</strong> ({effectDesc})
+                      <strong>d_z={dz.toFixed(2)}</strong>, g={g.toFixed(2)}
+                      <div style={{ fontSize: '0.75rem', color: 'var(--navy-500)' }}>{effectDesc} effect</div>
                     </td>
                     <td>{waitComp.p_value_ttest.toFixed(4)}</td>
-                    <td>{waitComp.p_value_wilcoxon.toFixed(4)}</td>
+                    <td>{adjP !== undefined ? adjP.toFixed(4) : 'N/A'}</td>
                     <td>
-                      {isSig ? (
-                        <span className="badge badge-green">Statistically Significant</span>
+                      {isSigHolm ? (
+                        <span className="badge badge-green">Holm-Significant</span>
+                      ) : isSigUncorr ? (
+                        <span className="badge badge-orange" title="Significant uncorrected, but not under Holm-Bonferroni step-down">
+                          Uncorr. only (p &lt; 0.05)
+                        </span>
                       ) : (
                         <span className="badge badge-gray">Not Significant</span>
+                      )}
+                      {waitComp.note && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--navy-500)', marginTop: 4 }}>
+                          {waitComp.note}
+                        </div>
                       )}
                     </td>
                   </tr>
