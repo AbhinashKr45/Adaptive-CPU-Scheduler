@@ -1,0 +1,49 @@
+# Python virtual environment & cache
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Environment files
+.env
+.env.local
+
+# Compiled C binaries & libraries
+*.exe
+*.o
+*.dll
+*.so
+*.dylib
+scheduler_cli
+test_fcfs
+test_sjf
+test_srtf
+test_priority
+test_rr
+test_simulation
+test_metrics
+test_comprehensive
+tests/bin/
+
+# Keep test C source files
+!tests/*.c
+!tests/*.h
+
+# SQLite databases
+*.db
+*.sqlite3
+
+# Node & Frontend build
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# Editor, OS and Temporary
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+results/
+data/uploads/

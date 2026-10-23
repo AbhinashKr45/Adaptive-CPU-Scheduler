@@ -1,0 +1,172 @@
+import pytest
+from fastapi.testclient import TestClient
+from backend.api import app
+from backend.c_bridge import run_c_simulation
+from backend.generator import generate_workload, calculate_workload_characteristics, PRESET_CONFIGS
+from backend.experiments import run_experiment_batch, compute_summary_stats, compute_paired_comparison
+from backend.recommender import recommend_scheduler, evaluate_adaptive_policy_on_held_out_seeds
+
+client = TestClient(app)
+
+def test_health_endpoint():
+    res = client.get("/api/v1/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "healthy"
+    assert data["c_engine"] == "authoritative"
+
+
+def test_c_simulation_fcfs():
+    procs = [
+        {"pid": 1, "arrival_time": 0, "burst_time": 5, "priority": 1},
+        {"pid": 2, "arrival_time": 2, "burst_time": 3, "priority": 2}
+    ]
+    res = run_c_simulation(procs, "FCFS")
+    assert res["status"] == "success"
+    assert res["algorithm"] == "FCFS"
+    assert res["metrics"]["total_busy_time"] == 8
+    assert res["metrics"]["makespan"] == 8
+    assert len(res["trace"]) >= 2
+
+
+def test_c_simulation_rr():
+    procs = [
+        {"pid": 1, "arrival_time": 0, "burst_time": 4, "priority": 1},
+        {"pid": 2, "arrival_time": 0, "burst_time": 4, "priority": 1}
+    ]
+    res = run_c_simulation(procs, "RR", quantum=2)
+    assert res["status"] == "success"
+    assert res["algorithm"] == "Round Robin"
+    assert res["quantum"] == 2
+    assert res["metrics"]["preemptions"] >= 2
+    assert res["metrics"]["makespan"] == 8
+
+
+def test_c_simulation_invalid_input_rejection():
+    # Duplicate PIDs
+    bad_procs = [
+        {"pid": 1, "arrival_time": 0, "burst_time": 4, "priority": 1},
+        {"pid": 1, "arrival_time": 1, "burst_time": 3, "priority": 1}
+    ]
+    with pytest.raises(ValueError):
+        run_c_simulation(bad_procs, "FCFS")
+
+
+def test_workload_generator_reproducibility():
+    wl1 = generate_workload(process_count=8, seed=123)
+    wl2 = generate_workload(process_count=8, seed=123)
+    assert wl1["processes"] == wl2["processes"]
+    assert wl1["characteristics"]["process_count"] == 8
+    assert "cv_burst" in wl1["characteristics"]
+
+
+def test_experiments_paired_batch():
+    exp = run_experiment_batch(
+        schedulers=["FCFS", "SJF", "SRTF"],
+        seeds=[10, 11, 12],
+        workload_config={"process_count": 5, "mean_burst": 6.0, "burst_std": 2.0}
+    )
+    assert exp["total_runs"] == 9
+    assert "SJF" in exp["summary"]
+    assert "avg_waiting_time" in exp["summary"]["SJF"]
+    assert exp["summary"]["SJF"]["avg_waiting_time"]["mean"] >= 0.0
+
+
+def test_adaptive_recommender():
+    # Short interactive workload -> recommend RR for response time
+    procs = [
+        {"pid": 1, "arrival_time": 0, "burst_time": 3, "priority": 1},
+        {"pid": 2, "arrival_time": 1, "burst_time": 2, "priority": 1},
+        {"pid": 3, "arrival_time": 2, "burst_time": 4, "priority": 1}
+    ]
+    rec_resp = recommend_scheduler(procs, objective="minimize_response")
+    assert rec_resp["recommended_scheduler"] == "RR"
+
+    # Held out seeds evaluation
+    wl_cfg = {"process_count": 5, "mean_burst": 8.0, "burst_std": 3.0}
+    eval_res = evaluate_adaptive_policy_on_held_out_seeds(wl_cfg, objective="minimize_waiting", held_out_seeds=[201, 202])
+    assert "adaptive_mean" in eval_res
+    assert "oracle_mean" in eval_res
+
+
+def test_api_full_flow():
+    # 1. Create Workload
+    payload = {
+        "name": "Integration Test Workload",
+        "description": "Test workload created via API",
+        "processes": [
+            {"pid": 1, "arrival_time": 0, "burst_time": 6, "priority": 1},
+            {"pid": 2, "arrival_time": 1, "burst_time": 2, "priority": 2},
+            {"pid": 3, "arrival_time": 2, "burst_time": 4, "priority": 3}
+        ]
+    }
+    create_res = client.post("/api/v1/workloads", json=payload)
+    assert create_res.status_code == 200
+    wl_data = create_res.json()
+    wl_id = wl_data["id"]
+
+    # 2. Simulate Workload
+    sim_payload = {
+        "workload_id": wl_id,
+        "algorithm": "SRTF",
+        "quantum": 2,
+        "processes": payload["processes"]
+    }
+    sim_res = client.post("/api/v1/simulate", json=sim_payload)
+    assert sim_res.status_code == 200
+    sim_data = sim_res.json()
+    assert sim_data["algorithm"] == "SRTF"
+    assert len(sim_data["trace"]) > 0
+
+    # 3. Compare All 5 Schedulers
+    comp_payload = {
+        "processes": payload["processes"],
+        "quantum": 2
+    }
+    comp_res = client.post("/api/v1/compare", json=comp_payload)
+    assert comp_res.status_code == 200
+    comp_data = comp_res.json()
+    assert "FCFS" in comp_data["results"]
+    assert "SJF" in comp_data["results"]
+    assert "SRTF" in comp_data["results"]
+    assert "PRIORITY" in comp_data["results"]
+    assert "RR" in comp_data["results"]
+
+    # 4. Recommendation
+    rec_payload = {
+        "processes": payload["processes"],
+        "objective": "minimize_waiting",
+        "quantum": 2,
+        "evaluate_held_out": False
+    }
+    rec_res = client.post("/api/v1/recommend", json=rec_payload)
+    assert rec_res.status_code == 200
+    assert "recommended_scheduler" in rec_res.json()
+
+    # 5. Cleanup
+    del_res = client.delete(f"/api/v1/workloads/{wl_id}")
+    assert del_res.status_code == 200
+
+
+def test_observation_time_fairness_api():
+    processes = [
+        {"pid": 1, "arrival_time": 0, "burst_time": 10, "priority": 1},
+        {"pid": 2, "arrival_time": 0, "burst_time": 10, "priority": 1}
+    ]
+    # Request with custom observation times
+    sim_res = client.post("/api/v1/simulate", json={
+        "algorithm": "RR",
+        "quantum": 2,
+        "processes": processes,
+        "observe_times": [5, 10, 20]
+    })
+    assert sim_res.status_code == 200
+    data = sim_res.json()
+    assert "observation_fairness" in data
+    obs = data["observation_fairness"]
+    assert len(obs) == 3
+    assert obs[0]["observation_time"] == 5
+    assert obs[0]["is_progress_defined"] is True
+    assert obs[0]["processes_arrived"] == 2
+    assert obs[2]["observation_time"] == 20
+    assert obs[2]["processes_completed"] == 2
