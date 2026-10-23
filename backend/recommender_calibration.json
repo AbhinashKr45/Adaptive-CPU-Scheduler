@@ -1,0 +1,21 @@
+{
+  "calibration_version": "2.0.0",
+  "training_seeds_range": [
+    1000,
+    1199
+  ],
+  "training_samples_count": 350,
+  "thresholds": {
+    "burst_cv_high": 0.457,
+    "burstiness_high": 0.75,
+    "simultaneous_arrival_span": 0,
+    "heavy_tail_alpha_threshold": 1.8,
+    "priority_spread_threshold": 2
+  },
+  "rule_definitions": {
+    "minimize_waiting": "Rule 1: If arrival_span == 0 -> SJF (Smith's rule optimal). Rule 2: If burst_cv >= {burst_cv_high} or burstiness >= {burstiness_high} -> SRTF (cuts head-of-line blocking). Rule 3: Else -> SJF (non-preemptive shortest job).",
+    "minimize_response": "Rule 1: If burst_cv >= 0.7 or priority_spread <= 1 -> RR (frequent round-robin time slicing maximizes immediate response). Rule 2: If priority_spread > 2 -> PRIORITY (prioritizes high-priority responsive jobs). Rule 3: Else -> SRTF.",
+    "penalize_context_switches": "Rule 1: FCFS (strictly non-preemptive with zero algorithmic preemption overhead). Rule 2: If arrival_span == 0 and burst_cv > 0.5 -> SJF (minimal switches + optimal order).",
+    "balance_fairness_performance": "Rule 1: If burst_cv >= 0.6 -> RR (prevents starvation of long jobs and ensures steady progress). Rule 2: Else -> SJF (high completion throughput with uniform progress)."
+  }
+}

@@ -137,6 +137,7 @@ class RecommendationRequest(BaseModel):
     processes: List[ProcessItem] = Field(..., min_length=1)
     objective: str = Field(default="minimize_waiting")
     quantum: int = Field(default=2, ge=1)
+    selector_mode: str = Field(default="rule_based", description="'rule_based' or 'decision_tree'")
     evaluate_held_out: bool = Field(default=True)
 
 

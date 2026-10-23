@@ -97,7 +97,13 @@ export const api = {
   },
 
   // Recommendation
-  async getRecommendation(processes: ProcessItem[], objective: string = 'minimize_waiting', quantum: number = 2, evaluateHeldOut: boolean = true): Promise<RecommendationResponse> {
+  async getRecommendation(
+    processes: ProcessItem[],
+    objective: string = 'minimize_waiting',
+    quantum: number = 2,
+    evaluateHeldOut: boolean = true,
+    selectorMode: string = 'rule_based'
+  ): Promise<RecommendationResponse> {
     const res = await fetch(`${API_BASE}/recommend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -105,6 +111,7 @@ export const api = {
         processes,
         objective,
         quantum,
+        selector_mode: selectorMode,
         evaluate_held_out: evaluateHeldOut
       })
     });

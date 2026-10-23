@@ -163,14 +163,32 @@ export interface ExperimentItem {
 
 export interface RecommendationResponse {
   recommended_scheduler: string;
+  selector_mode: string;
   objective: string;
   objective_label: string;
   explanation: string;
-  workload_characteristics: WorkloadCharacteristics;
+  rule_fired?: string;
+  decision_path?: string;
+  workload_features: Record<string, any>;
+  workload_characteristics?: WorkloadCharacteristics;
+  calibration_metadata?: {
+    version?: string;
+    train_seeds?: number[];
+    training_samples?: number;
+    zero_leakage_verified?: boolean;
+  };
+  overhead_seconds?: number;
   trade_offs: string[];
   alternatives: string[];
   uncertainty: string;
   scores: Record<string, number>;
+  oracle?: {
+    oracle_scheduler: string;
+    oracle_score: number;
+    adaptive_matched_oracle: boolean;
+    oracle_gap: number;
+    all_scores: Record<string, number>;
+  };
   all_metrics?: Record<string, AggregateMetricsItem>;
   objective_definition: string;
   weights?: {

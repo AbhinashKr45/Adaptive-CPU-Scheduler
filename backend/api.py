@@ -322,30 +322,54 @@ def compare_schedulers(req: CompareRequest):
 def get_recommendation(req: RecommendationRequest, db: Session = Depends(get_db)):
     procs_data = [p.model_dump() for p in req.processes]
 
-    rec = recommend_scheduler(procs_data, objective=req.objective, quantum=req.quantum)
+    # Feature-only recommendation (Zero simulation leakage)
+    rec = recommend_scheduler(
+        procs_data,
+        objective=req.objective,
+        quantum=req.quantum,
+        selector_mode=req.selector_mode
+    )
 
-    # Optional held-out evaluation
+    # Compute ex-post oracle baseline on this specific workload for transparent comparison
+    from backend.recommender import oracle_select
+    oracle_res = oracle_select(procs_data, objective=req.objective, quantum=req.quantum)
+    rec["oracle"] = {
+        "oracle_scheduler": oracle_res["oracle_scheduler"],
+        "oracle_score": oracle_res["oracle_score"],
+        "adaptive_matched_oracle": (rec["recommended_scheduler"] == oracle_res["oracle_scheduler"]),
+        "oracle_gap": round(max(0.0, oracle_res["oracle_score"] - oracle_res["scores"].get(rec["recommended_scheduler"], 0.0)), 4),
+        "all_scores": oracle_res["scores"]
+    }
+
+    # Optional held-out evaluation across disjoint test seeds
     held_out = None
     if req.evaluate_held_out:
-        # Create workload config matching characteristics
-        chars = rec["workload_characteristics"]
+        chars = rec["workload_features"]
+        mean_b = chars.get("burst_mean", 10.0)
+        cv = chars.get("burst_cv", 0.4)
+        std_b = chars.get("burst_std", mean_b * cv)
         wl_cfg = {
-            "process_count": chars["process_count"],
-            "arrival_distribution": "uniform" if chars["arrival_span"] > 0 else "simultaneous",
+            "process_count": chars.get("process_count", 10),
+            "arrival_distribution": "uniform" if chars.get("arrival_span", 0) > 0 else "simultaneous",
             "burst_distribution": "normal",
-            "mean_burst": chars["mean_burst"],
-            "burst_std": chars["std_burst"],
-            "skew_level": "high" if chars["skewness"] > 1.0 else "medium",
-            "max_arrival": max(10, chars["arrival_span"])
+            "mean_burst": mean_b,
+            "burst_std": std_b,
+            "skew_level": "high" if chars.get("burst_skewness", 0.0) > 1.0 else "medium",
+            "max_arrival": max(10, chars.get("arrival_span", 20))
         }
-        held_out = evaluate_adaptive_policy_on_held_out_seeds(wl_cfg, objective=req.objective, rr_quantum=req.quantum)
+        held_out = evaluate_adaptive_policy_on_held_out_seeds(
+            wl_cfg,
+            objective=req.objective,
+            rr_quantum=req.quantum,
+            selector_mode=req.selector_mode
+        )
 
     # Persist recommendation
     record = RecommendationRecord(
         objective=req.objective,
         recommended_scheduler=rec["recommended_scheduler"],
         explanation=rec["explanation"],
-        workload_features_json=json.dumps(rec["workload_characteristics"])
+        workload_features_json=json.dumps(rec["workload_features"])
     )
     db.add(record)
     db.commit()

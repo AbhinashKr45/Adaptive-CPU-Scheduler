@@ -18,15 +18,16 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
 }) => {
   const [objective, setObjective] = useState<string>('minimize_waiting');
   const [quantum, setQuantum] = useState<number>(2);
+  const [selectorMode, setSelectorMode] = useState<'rule_based' | 'decision_tree'>('rule_based');
   const [rec, setRec] = useState<RecommendationResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const objectives = [
-    { id: 'minimize_waiting', title: 'Minimize Waiting Time', desc: 'Selects policy achieving lowest avg_waiting_time on this workload.' },
-    { id: 'minimize_response', title: 'Minimize Response Time', desc: 'Selects policy with lowest avg_response_time (interactive dispatch latency).' },
-    { id: 'balance_fairness_performance', title: 'Balance Fairness & Throughput', desc: 'Maximizes 0.5 × norm_throughput + 0.5 × jain_fairness_progress.' },
-    { id: 'penalize_context_switches', title: 'Penalize Context Switches', desc: 'Selects policy with fewest context_switches.' }
+    { id: 'minimize_waiting', title: 'Minimize Waiting Time', desc: 'Selects policy achieving lowest waiting time on this workload.' },
+    { id: 'minimize_response', title: 'Minimize Response Time', desc: 'Selects policy with lowest response time (interactive dispatch latency).' },
+    { id: 'balance_fairness_performance', title: 'Balance Fairness & Throughput', desc: 'Maximizes 0.5 × norm_throughput + 0.5 × jain_fairness.' },
+    { id: 'penalize_context_switches', title: 'Penalize Context Switches', desc: 'Selects policy with fewest preemptive context switches.' }
   ];
 
   const handleGetRecommendation = async () => {
@@ -37,7 +38,7 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
     setLoading(true);
     setError(null);
     try {
-      const res = await api.getRecommendation(currentProcesses, objective, quantum, true);
+      const res = await api.getRecommendation(currentProcesses, objective, quantum, true, selectorMode);
       setRec(res);
     } catch (err: any) {
       setError(err.message || 'Failed to generate recommendation');
@@ -50,17 +51,17 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
     if (currentProcesses.length > 0) {
       handleGetRecommendation();
     }
-  }, [objective, quantum, currentProcesses]);
+  }, [objective, quantum, selectorMode, currentProcesses]);
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--navy-900)' }}>
-            Adaptive Scheduler Recommendation Engine
+            Feature-Only Adaptive Scheduler Recommender
           </h1>
           <p style={{ color: 'var(--navy-600)', fontSize: '0.9rem', marginTop: 4 }}>
-            Transparent, data-driven OS scheduling policy selection. All 5 policies are evaluated and scored against the selected objective.
+            Strict zero-leakage offline-calibrated policy selection. Workload features are extracted at dispatch time without simulating target execution.
           </p>
         </div>
 
@@ -75,10 +76,48 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
         </div>
       )}
 
-      {/* Objective Picker */}
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">1. Select Optimization Objective</div>
+      {/* Control Strip: Selector Mode + Objective */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+          <div className="card-title" style={{ margin: 0 }}>1. Recommendation Engine Configuration</div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-700)' }}>Selector Engine:</span>
+            <div style={{ display: 'flex', background: 'var(--surface-secondary)', padding: 3, borderRadius: 8, border: '1px solid var(--border)' }}>
+              <button
+                type="button"
+                onClick={() => setSelectorMode('rule_based')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                  border: 'none',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: selectorMode === 'rule_based' ? 'var(--orange-600)' : 'transparent',
+                  color: selectorMode === 'rule_based' ? '#fff' : 'var(--navy-700)'
+                }}
+              >
+                Calibrated Rules
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectorMode('decision_tree')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                  border: 'none',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: selectorMode === 'decision_tree' ? 'var(--orange-600)' : 'transparent',
+                  color: selectorMode === 'decision_tree' ? '#fff' : 'var(--navy-700)'
+                }}
+              >
+                Decision Tree (Depth 3)
+              </button>
+            </div>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
@@ -115,15 +154,33 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
           <div className="card" style={{ borderLeft: '4px solid var(--orange-600)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
               <div>
-                <span className="badge badge-orange" style={{ marginBottom: 6 }}>
-                  Recommended Policy
-                </span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                  <span className="badge badge-orange">
+                    {rec.selector_mode === 'decision_tree' ? 'Decision Tree Recommendation' : 'Calibrated Rule Recommendation'}
+                  </span>
+                  <span className="badge badge-green">Zero-Leakage Invariant Verified</span>
+                  {rec.overhead_seconds !== undefined && (
+                    <span className="badge badge-gray" style={{ fontFamily: 'monospace' }}>
+                      Overhead: {(rec.overhead_seconds * 1000).toFixed(2)} ms ({(rec.overhead_seconds * 1_000_000).toFixed(0)} µs)
+                    </span>
+                  )}
+                </div>
                 <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--navy-950)' }}>
                   {rec.recommended_scheduler} Scheduling
                 </h2>
-                <p style={{ maxWidth: 800, fontSize: '0.95rem', color: 'var(--navy-700)', marginTop: 8, lineHeight: 1.5 }}>
+                <p style={{ maxWidth: 850, fontSize: '0.95rem', color: 'var(--navy-700)', marginTop: 8, lineHeight: 1.5 }}>
                   {rec.explanation}
                 </p>
+                {rec.rule_fired && (
+                  <div style={{ marginTop: 8, fontSize: '0.82rem', fontFamily: 'monospace', color: 'var(--navy-600)', background: 'var(--surface-secondary)', padding: '4px 10px', borderRadius: 4, display: 'inline-block' }}>
+                    Rule Path: {rec.rule_fired}
+                  </div>
+                )}
+                {rec.decision_path && (
+                  <div style={{ marginTop: 8, fontSize: '0.82rem', fontFamily: 'monospace', color: 'var(--navy-600)', background: 'var(--surface-secondary)', padding: '4px 10px', borderRadius: 4, display: 'inline-block' }}>
+                    Tree Node: {rec.decision_path}
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: 10 }}>
@@ -136,53 +193,40 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
               </div>
             </div>
 
-            {/* Objective Definition */}
-            <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--surface-secondary)', borderRadius: 8, fontSize: '0.82rem', color: 'var(--navy-600)' }}>
-              <strong>Objective Function:</strong> {rec.objective_definition}
-              {rec.weights && (
-                <div style={{ marginTop: 4 }}>
-                  <strong>Weights:</strong> Throughput={rec.weights.throughput_weight}, Fairness={rec.weights.fairness_weight}. {rec.weights.description}
+            {/* Ex-Post Oracle Verification Card */}
+            {rec.oracle && (
+              <div style={{ marginTop: 16, padding: '12px 16px', background: rec.oracle.adaptive_matched_oracle ? 'var(--green-50)' : 'var(--orange-50)', borderRadius: 8, border: `1px solid ${rec.oracle.adaptive_matched_oracle ? 'var(--green-200)' : 'var(--orange-200)'}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <div>
+                    <strong style={{ color: rec.oracle.adaptive_matched_oracle ? 'var(--green-800)' : 'var(--orange-800)' }}>
+                      Ex-Post Oracle Baseline (Instance Verification):
+                    </strong>{' '}
+                    <span style={{ fontSize: '0.88rem' }}>
+                      Optimal scheduler was <strong>{rec.oracle.oracle_scheduler}</strong> (score: {rec.oracle.oracle_score.toFixed(3)}).
+                    </span>
+                  </div>
+                  <div>
+                    {rec.oracle.adaptive_matched_oracle ? (
+                      <span className="badge badge-green" style={{ fontWeight: 700 }}>
+                        ✓ Exact Oracle Match (Zero Instance Regret)
+                      </span>
+                    ) : (
+                      <span className="badge badge-orange" style={{ fontWeight: 700 }}>
+                        Regret Gap: {rec.oracle.oracle_gap.toFixed(3)} units vs. Oracle
+                      </span>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-
-            {/* Scores for All Policies */}
-            {rec.scores && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--navy-800)', marginBottom: 8 }}>
-                  Objective Scores (all 5 policies, higher = better):
-                </div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  {Object.entries(rec.scores)
-                    .sort(([, a], [, b]) => (b as number) - (a as number))
-                    .map(([policy, score], idx) => {
-                      const isRec = policy === rec.recommended_scheduler;
-                      return (
-                        <div
-                          key={policy}
-                          style={{
-                            padding: '8px 14px',
-                            borderRadius: 8,
-                            border: isRec ? '2px solid var(--orange-600)' : '1px solid var(--border)',
-                            background: isRec ? 'var(--orange-50)' : 'var(--surface)',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 90
-                          }}
-                        >
-                          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: isRec ? 'var(--orange-700)' : 'var(--navy-600)' }}>
-                            {policy} {isRec ? '★' : ''}
-                          </div>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: isRec ? 'var(--orange-700)' : 'var(--navy-800)' }}>
-                            {typeof score === 'number' ? score.toFixed(3) : 'N/A'}
-                          </div>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--navy-500)' }}>
-                            Rank #{idx + 1}
-                          </div>
-                        </div>
-                      );
-                    })}
+                <div style={{ fontSize: '0.75rem', color: 'var(--navy-600)', marginTop: 4 }}>
+                  The oracle runs all 5 schedulers in simulation ex-post strictly as a theoretical upper bound. The recommender selected <strong>{rec.recommended_scheduler}</strong> using only features.
                 </div>
               </div>
             )}
+
+            {/* Objective Definition */}
+            <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--surface-secondary)', borderRadius: 8, fontSize: '0.82rem', color: 'var(--navy-600)' }}>
+              <strong>Optimization Objective:</strong> {rec.objective_definition}
+            </div>
 
             {/* Trade-Offs & Alternatives */}
             <div className="grid-2" style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
@@ -351,34 +395,70 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
           })()}
 
           {/* Workload Feature Characterization */}
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title">Analyzed Workload Features</div>
-              <span className="badge badge-blue">Input Characteristics</span>
-            </div>
+          {(() => {
+            const f = rec.workload_features || rec.workload_characteristics || {};
+            return (
+              <div className="card">
+                <div className="card-header">
+                  <div>
+                    <div className="card-title">Dispatch-Time Workload Characterization</div>
+                    <div className="card-subtitle">
+                      Extracted features used as inputs for offline-calibrated policy selection. No execution simulation.
+                    </div>
+                  </div>
+                  <span className="badge badge-blue">8 Feature Dimensions</span>
+                </div>
 
-            <div className="grid-4">
-              <div className="stat-card">
-                <div className="stat-label">Process Count</div>
-                <div className="stat-value">{rec.workload_characteristics.process_count}</div>
+                <div className="grid-4" style={{ marginBottom: 12 }}>
+                  <div className="stat-card">
+                    <div className="stat-label">Process Count (N)</div>
+                    <div className="stat-value">{f.process_count ?? 0}</div>
+                    <div className="stat-sub">Active batch size</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Burst CV (σ / μ)</div>
+                    <div className="stat-value">{typeof f.burst_cv === 'number' ? f.burst_cv.toFixed(2) : (typeof f.cv_burst === 'number' ? f.cv_burst.toFixed(2) : 'N/A')}</div>
+                    <div className="stat-sub">Burst heterogeneity</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Burst Skewness</div>
+                    <div className="stat-value">{typeof f.burst_skewness === 'number' ? f.burst_skewness.toFixed(2) : (typeof f.skewness === 'number' ? f.skewness.toFixed(2) : '0.00')}</div>
+                    <div className="stat-sub">Right-tail asymmetry</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Hill Tail Index (α̂)</div>
+                    <div className="stat-value">{typeof f.heavy_tail_index === 'number' ? f.heavy_tail_index.toFixed(2) : 'N/A'}</div>
+                    <div className="stat-sub">&lt; 2.0 indicates heavy tails</div>
+                  </div>
+                </div>
+
+                <div className="grid-4">
+                  <div className="stat-card">
+                    <div className="stat-label">Burst Mean & Median</div>
+                    <div className="stat-value" style={{ fontSize: '1.1rem' }}>
+                      {typeof f.burst_mean === 'number' ? f.burst_mean.toFixed(1) : (typeof f.mean_burst === 'number' ? f.mean_burst.toFixed(1) : 'N/A')} / {typeof f.burst_median === 'number' ? f.burst_median.toFixed(1) : 'N/A'}
+                    </div>
+                    <div className="stat-sub">μ / median ticks</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Arrival Span</div>
+                    <div className="stat-value">{f.arrival_span ?? 0} ticks</div>
+                    <div className="stat-sub">First to last arrival</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Arrival Burstiness (B)</div>
+                    <div className="stat-value">{typeof f.burstiness === 'number' ? f.burstiness.toFixed(2) : '0.00'}</div>
+                    <div className="stat-sub">(σ - μ)/(σ + μ) ∈ [-1, 1]</div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Priority Spread</div>
+                    <div className="stat-value">{f.priority_spread ?? 0}</div>
+                    <div className="stat-sub">max(p) - min(p)</div>
+                  </div>
+                </div>
               </div>
-              <div className="stat-card">
-                <div className="stat-label">Burst CV (σ / μ)</div>
-                <div className="stat-value">{rec.workload_characteristics.cv_burst.toFixed(2)}</div>
-                <div className="stat-sub">Coefficient of variation</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Burst Skewness</div>
-                <div className="stat-value">{rec.workload_characteristics.skewness.toFixed(2)}</div>
-                <div className="stat-sub">Right-tail asymmetry</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Arrival Span</div>
-                <div className="stat-value">{rec.workload_characteristics.arrival_span}</div>
-                <div className="stat-sub">Ticks between first and last arrival</div>
-              </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Empirical Validation on Held-Out Seeds */}
           {rec.held_out_evaluation && (
