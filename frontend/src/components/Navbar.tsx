@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Cpu, LayoutDashboard, FlaskConical, Play,
   BarChart2, Scale, Layers, LineChart, Sparkles,
-  History, BookOpen
+  History, BookOpen, Database
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -14,6 +14,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'laboratory', label: 'Workload Laboratory', icon: FlaskConical },
+    { id: 'traces', label: 'Trace Laboratory', icon: Database },
     { id: 'simulator', label: 'Scheduler Simulator', icon: Play },
     { id: 'comparison', label: 'Scheduler Comparison', icon: BarChart2 },
     { id: 'fairness', label: 'Fairness Laboratory', icon: Scale },

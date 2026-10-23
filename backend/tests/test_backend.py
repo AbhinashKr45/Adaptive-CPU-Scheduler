@@ -170,3 +170,73 @@ def test_observation_time_fairness_api():
     assert obs[0]["processes_arrived"] == 2
     assert obs[2]["observation_time"] == 20
     assert obs[2]["processes_completed"] == 2
+
+
+def test_trace_api_endpoints():
+    """Validates complete Trace Laboratory API workflow via TestClient."""
+    # 1. Upload/load bundled trace
+    upload_res = client.post("/api/v1/traces/upload", data={"sample_bundled": "swf", "name": "Test SWF Trace"})
+    assert upload_res.status_code == 200, f"Upload failed: {upload_res.text}"
+    trace_info = upload_res.json()
+    trace_id = trace_info["id"]
+    assert trace_info["format"] == "swf"
+    assert trace_info["cleaned_jobs_count"] > 0
+    assert "cleaning_report" in trace_info
+    assert "features" in trace_info
+
+    # 2. List traces
+    list_res = client.get("/api/v1/traces")
+    assert list_res.status_code == 200
+    traces = list_res.json()
+    assert any(t["id"] == trace_id for t in traces)
+
+    # 3. Get trace details & features
+    details_res = client.get(f"/api/v1/traces/{trace_id}")
+    assert details_res.status_code == 200
+    assert details_res.json()["name"] == "Test SWF Trace"
+
+    feat_res = client.get(f"/api/v1/traces/{trace_id}/features")
+    assert feat_res.status_code == 200
+    feat_data = feat_res.json()
+    assert "burst_mean" in feat_data
+    assert "heavy_tail_index" in feat_data
+
+    # 4. Sample trace and save as workload
+    sample_res = client.post(f"/api/v1/traces/{trace_id}/workload", json={
+        "method": "random",
+        "count": 10,
+        "scale_factor": 1.0,
+        "seed": 42,
+        "save_as_workload": True,
+        "workload_name": "Sampled Trace Test WL"
+    })
+    assert sample_res.status_code == 200
+    sample_data = sample_res.json()
+    assert sample_data["process_count"] == 10
+    assert len(sample_data["processes"]) == 10
+    saved_wl_id = sample_data["saved_workload_id"]
+    assert saved_wl_id is not None
+
+    # 5. Run simulation on the trace-derived workload
+    sim_res = client.post("/api/v1/simulate", json={
+        "workload_id": saved_wl_id,
+        "algorithm": "FCFS",
+        "processes": sample_data["processes"]
+    })
+    assert sim_res.status_code == 200
+    sim_data = sim_res.json()
+    assert sim_data["metrics"]["makespan"] > 0
+    assert sim_data["metrics"]["p95_waiting_time"] >= 0.0
+
+    # 6. Compare with synthetic workload
+    comp_res = client.post(f"/api/v1/traces/{trace_id}/compare-synthetic", json={
+        "seed": 42,
+        "sampling_count": 15,
+        "scale_factor": 1.0
+    })
+    assert comp_res.status_code == 200
+    comp_data = comp_res.json()
+    assert "best_generator_params" in comp_data
+    assert "comparison_stats" in comp_data
+    assert comp_data["best_composite_distance"] >= 0.0
+

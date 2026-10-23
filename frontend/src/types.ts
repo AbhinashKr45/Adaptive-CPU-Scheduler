@@ -215,3 +215,86 @@ export interface OverviewData {
     created_at: string;
   }>;
 }
+
+export interface TraceListItem {
+  id: number;
+  name: string;
+  filename: string;
+  format: string;
+  cleaned_jobs_count: number;
+  created_at: string;
+}
+
+export interface TraceDetails {
+  id: number;
+  name: string;
+  filename: string;
+  format: string;
+  cleaned_jobs_count: number;
+  cleaning_report: {
+    total_raw_jobs: number;
+    dropped_missing_values: number;
+    dropped_negative_submit: number;
+    dropped_non_positive_runtime: number;
+    capped_outliers: number;
+    outlier_percentile: number;
+    outlier_runtime_threshold: number;
+    cleaned_jobs_count: number;
+    steps_log: string[];
+  };
+  features: {
+    process_count: number;
+    burst_mean: number;
+    burst_median: number;
+    burst_cv: number;
+    burst_skewness: number;
+    burst_kurtosis: number;
+    arrival_span: number;
+    mean_inter_arrival_time: number;
+    burstiness: number;
+    heavy_tail_index: number;
+    priority_spread: number;
+  };
+  created_at: string;
+}
+
+export interface TraceSampleResponse {
+  trace_id: number;
+  sampling_config: any;
+  scaling_loss: {
+    scale_factor_seconds_per_tick: number;
+    mean_absolute_error_seconds: number;
+    relative_mean_absolute_error: number;
+    max_burst_cap_ticks: number;
+    bursts_capped_count: number;
+    note: string;
+  };
+  process_count: number;
+  processes: ProcessItem[];
+  features: any;
+  saved_workload_id?: number | null;
+}
+
+export interface TraceCompareSyntheticResponse {
+  trace_id: number;
+  trace_features: any;
+  best_generator_params: {
+    arrival_distribution: string;
+    burst_distribution: string;
+    mean_burst: number;
+    burst_std: number;
+    max_arrival: number;
+    process_count: number;
+  };
+  best_composite_distance: number;
+  comparison_stats: {
+    burst_ks_stat: number;
+    burst_ks_pvalue: number;
+    burst_wasserstein: number;
+    inter_arrival_ks_stat: number;
+    inter_arrival_ks_pvalue: number;
+    inter_arrival_wasserstein: number;
+    composite_distance: number;
+  };
+  synthetic_processes: ProcessItem[];
+}

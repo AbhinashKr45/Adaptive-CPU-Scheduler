@@ -165,5 +165,47 @@ export const api = {
   async deleteHistorySimulation(id: number): Promise<{ status: string }> {
     const res = await fetch(`${API_BASE}/history/simulations/${id}`, { method: 'DELETE' });
     return handleResponse<{ status: string }>(res);
+  },
+
+  // Traces (Phase 3)
+  async uploadTrace(formData: FormData): Promise<any> {
+    const res = await fetch(`${API_BASE}/traces/upload`, {
+      method: 'POST',
+      body: formData
+    });
+    return handleResponse<any>(res);
+  },
+
+  async listTraces(): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/traces`);
+    return handleResponse<any[]>(res);
+  },
+
+  async getTraceDetails(id: number): Promise<any> {
+    const res = await fetch(`${API_BASE}/traces/${id}`);
+    return handleResponse<any>(res);
+  },
+
+  async getTraceFeatures(id: number): Promise<any> {
+    const res = await fetch(`${API_BASE}/traces/${id}/features`);
+    return handleResponse<any>(res);
+  },
+
+  async sampleTraceWorkload(id: number, req: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/traces/${id}/workload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req)
+    });
+    return handleResponse<any>(res);
+  },
+
+  async compareTraceWithSynthetic(id: number, req: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/traces/${id}/compare-synthetic`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req)
+    });
+    return handleResponse<any>(res);
   }
 };

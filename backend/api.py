@@ -1,19 +1,22 @@
 import io
+import os
 import json
 import csv
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, Depends, HTTPException, Query, Response
+from fastapi import FastAPI, Depends, HTTPException, Query, Response, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from backend.database import get_db, init_db
-from backend.models import Workload, SimulationRun, Experiment, RecommendationRecord
+from backend.models import Workload, SimulationRun, Experiment, RecommendationRecord, TraceRecord
 from backend.schemas import (
     ProcessItem, SimulationRequest, SimulationResponse,
     CompareRequest, CompareResponse,
     WorkloadCreateRequest, WorkloadResponse, WorkloadGenerateRequest,
-    ExperimentCreateRequest, RecommendationRequest
+    ExperimentCreateRequest, RecommendationRequest,
+    TraceUploadResponse, TraceListItem, TraceSampleRequest, TraceSampleResponse,
+    TraceCompareSyntheticRequest, TraceCompareSyntheticResponse
 )
 from backend.c_bridge import run_c_simulation
 from backend.generator import (
@@ -22,6 +25,10 @@ from backend.generator import (
 )
 from backend.experiments import run_experiment_batch, export_experiment_to_dataframe
 from backend.recommender import recommend_scheduler, evaluate_adaptive_policy_on_held_out_seeds
+from backend.traces import (
+    parse_trace, clean_trace, scale_trace, sample_trace,
+    extract_workload_features, compare_distributions, fit_synthetic_to_trace
+)
 
 # Initialize DB tables
 init_db()
@@ -532,3 +539,222 @@ def delete_history_simulation(run_id: int, db: Session = Depends(get_db)):
     db.delete(r)
     db.commit()
     return {"status": "success", "message": f"Simulation run {run_id} deleted"}
+
+
+# ==========================================
+# TRACE LABORATORY API (PHASE 3)
+# ==========================================
+
+@app.post("/api/v1/traces/upload", response_model=TraceUploadResponse)
+async def upload_trace(
+    file: Optional[UploadFile] = File(None),
+    raw_text: Optional[str] = Form(None),
+    name: Optional[str] = Form(None),
+    sample_bundled: Optional[str] = Form(None),
+    outlier_percentile: float = Form(99.0),
+    db: Session = Depends(get_db)
+):
+    """
+    Uploads or loads a trace (SWF or CSV), runs the cleaning pipeline,
+    extracts features, and persists the trace in the database.
+    """
+    content = ""
+    filename = "uploaded_trace.csv"
+
+    if sample_bundled in ["swf", "csv"]:
+        ext = sample_bundled
+        sample_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "traces", f"sample_workload.{ext}")
+        if os.path.exists(sample_path):
+            with open(sample_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            filename = f"sample_workload.{ext}"
+            if not name:
+                name = f"Bundled {sample_bundled.upper()} Benchmark Trace"
+        else:
+            raise HTTPException(status_code=404, detail=f"Bundled sample {sample_bundled} not found on disk")
+    elif file is not None:
+        filename = file.filename or "uploaded_trace.csv"
+        raw_bytes = await file.read()
+        content = raw_bytes.decode("utf-8", errors="replace")
+    elif raw_text:
+        content = raw_text
+        filename = "pasted_trace.csv"
+    else:
+        raise HTTPException(status_code=400, detail="Must provide a file, raw_text, or sample_bundled ('swf' or 'csv')")
+
+    if not content.strip():
+        raise HTTPException(status_code=400, detail="Trace content is empty")
+
+    fmt = "swf" if filename.lower().endswith(".swf") or content.strip().startswith(";") else "csv"
+    trace_name = name or (filename.rsplit(".", 1)[0].replace("_", " ").title())
+
+    try:
+        raw_df = parse_trace(content, filename_hint=filename)
+        if len(raw_df) == 0:
+            raise HTTPException(status_code=400, detail="Parser extracted 0 valid job records from input")
+        clean_df, report = clean_trace(raw_df, outlier_percentile=outlier_percentile)
+        if len(clean_df) == 0:
+            raise HTTPException(status_code=400, detail="All jobs were dropped during cleaning pipeline")
+        features = extract_workload_features(clean_df)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Trace parsing/cleaning failed: {str(e)}")
+
+    record = TraceRecord(
+        name=trace_name,
+        filename=filename,
+        format=fmt,
+        raw_content=content,
+        cleaning_report_json=json.dumps(report.to_dict()),
+        features_json=json.dumps(features),
+        cleaned_jobs_count=len(clean_df)
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    return TraceUploadResponse(
+        id=record.id,
+        name=record.name,
+        filename=record.filename,
+        format=record.format,
+        cleaned_jobs_count=record.cleaned_jobs_count,
+        cleaning_report=report.to_dict(),
+        features=features,
+        created_at=record.created_at.isoformat()
+    )
+
+
+@app.get("/api/v1/traces", response_model=List[TraceListItem])
+def list_traces(db: Session = Depends(get_db)):
+    """Lists all stored workload traces."""
+    traces = db.query(TraceRecord).order_by(desc(TraceRecord.created_at)).all()
+    return [
+        TraceListItem(
+            id=t.id,
+            name=t.name,
+            filename=t.filename,
+            format=t.format,
+            cleaned_jobs_count=t.cleaned_jobs_count,
+            created_at=t.created_at.isoformat()
+        )
+        for t in traces
+    ]
+
+
+@app.get("/api/v1/traces/{trace_id}")
+def get_trace_details(trace_id: int, db: Session = Depends(get_db)):
+    """Retrieves full details of a trace including cleaning report and features."""
+    t = db.query(TraceRecord).filter(TraceRecord.id == trace_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Trace record not found")
+    return {
+        "id": t.id,
+        "name": t.name,
+        "filename": t.filename,
+        "format": t.format,
+        "cleaned_jobs_count": t.cleaned_jobs_count,
+        "cleaning_report": json.loads(t.cleaning_report_json),
+        "features": json.loads(t.features_json),
+        "created_at": t.created_at.isoformat()
+    }
+
+
+@app.get("/api/v1/traces/{trace_id}/features")
+def get_trace_features(trace_id: int, db: Session = Depends(get_db)):
+    """Returns extracted statistical features for a trace."""
+    t = db.query(TraceRecord).filter(TraceRecord.id == trace_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Trace record not found")
+    return json.loads(t.features_json)
+
+
+@app.post("/api/v1/traces/{trace_id}/workload", response_model=TraceSampleResponse)
+def sample_trace_workload(trace_id: int, req: TraceSampleRequest, db: Session = Depends(get_db)):
+    """
+    Scales and samples a trace into a simulator-ready workload.
+    Guarantees reproducibility and chronological arrival ordering.
+    """
+    t = db.query(TraceRecord).filter(TraceRecord.id == trace_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Trace record not found")
+
+    raw_df = parse_trace(t.raw_content, filename_hint=t.filename)
+    clean_df, _ = clean_trace(raw_df)
+    scaled_df, scaling_loss = scale_trace(
+        clean_df,
+        scale_factor=req.scale_factor,
+        max_burst_tick=req.max_burst_tick
+    )
+
+    procs = sample_trace(
+        scaled_df,
+        method=req.method,
+        count=req.count,
+        window_start_tick=req.window_start_tick,
+        window_duration_ticks=req.window_duration_ticks,
+        seed=req.seed
+    )
+
+    features = extract_workload_features(procs)
+    saved_wl_id = None
+
+    if req.save_as_workload:
+        wl_name = req.workload_name or f"{t.name} Sample ({len(procs)} procs)"
+        db_wl = Workload(
+            name=wl_name,
+            description=f"Trace-derived workload from {t.name} using {req.method} sampling (seed={req.seed}, scale={req.scale_factor})",
+            process_count=len(procs),
+            processes_json=json.dumps(procs),
+            generator_config_json=json.dumps({
+                "source_trace_id": t.id,
+                "source_trace_name": t.name,
+                "sampling_config": req.model_dump(),
+                "scaling_loss": scaling_loss
+            })
+        )
+        db.add(db_wl)
+        db.commit()
+        db.refresh(db_wl)
+        saved_wl_id = db_wl.id
+
+    return TraceSampleResponse(
+        trace_id=t.id,
+        sampling_config=req.model_dump(),
+        scaling_loss=scaling_loss,
+        process_count=len(procs),
+        processes=[ProcessItem(**p) for p in procs],
+        features=features,
+        saved_workload_id=saved_wl_id
+    )
+
+
+@app.post("/api/v1/traces/{trace_id}/compare-synthetic", response_model=TraceCompareSyntheticResponse)
+def compare_trace_with_synthetic(trace_id: int, req: TraceCompareSyntheticRequest, db: Session = Depends(get_db)):
+    """
+    Compares the trace distribution against synthetic workloads using KS tests and
+    Wasserstein distances, and finds best matching generator parameters via grid search.
+    """
+    t = db.query(TraceRecord).filter(TraceRecord.id == trace_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Trace record not found")
+
+    raw_df = parse_trace(t.raw_content, filename_hint=t.filename)
+    clean_df, _ = clean_trace(raw_df)
+    scaled_df, _ = scale_trace(clean_df, scale_factor=req.scale_factor)
+    trace_procs = sample_trace(scaled_df, method="random", count=req.sampling_count, seed=req.seed)
+
+    if not trace_procs:
+        raise HTTPException(status_code=400, detail="No processes could be sampled from trace")
+
+    trace_feat = extract_workload_features(trace_procs)
+    fit_result = fit_synthetic_to_trace(trace_procs, seed=req.seed)
+
+    return TraceCompareSyntheticResponse(
+        trace_id=t.id,
+        trace_features=trace_feat,
+        best_generator_params=fit_result["best_generator_params"],
+        best_composite_distance=fit_result["best_composite_distance"],
+        comparison_stats=fit_result["comparison_stats"],
+        synthetic_processes=[ProcessItem(**p) for p in fit_result["best_synthetic_processes"]]
+    )
+

@@ -75,3 +75,18 @@ class RecommendationRecord(Base):
     explanation = Column(Text, nullable=False)
     workload_features_json = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False, index=True)
+
+
+class TraceRecord(Base):
+    __tablename__ = "traces"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(120), nullable=False, index=True)
+    filename = Column(String(200), nullable=False)
+    format = Column(String(20), nullable=False)
+    raw_content = Column(Text, nullable=False)
+    cleaning_report_json = Column(Text, nullable=False)
+    features_json = Column(Text, nullable=False)
+    cleaned_jobs_count = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False, index=True)
+

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Navbar } from './components/Navbar';
 import { OverviewPage } from './pages/OverviewPage';
 import { WorkloadLaboratoryPage } from './pages/WorkloadLaboratoryPage';
+import { TraceLabPage } from './pages/TraceLabPage';
 import { SchedulerSimulatorPage } from './pages/SchedulerSimulatorPage';
 import { SchedulerComparisonPage } from './pages/SchedulerComparisonPage';
 import { FairnessLaboratoryPage } from './pages/FairnessLaboratoryPage';
@@ -48,6 +49,13 @@ export function App() {
           <WorkloadLaboratoryPage
             currentProcesses={currentProcesses}
             setCurrentProcesses={setCurrentProcesses}
+            onNavigate={handleNavigate}
+          />
+        )}
+
+        {activeTab === 'traces' && (
+          <TraceLabPage
+            onLoadWorkload={handleLoadWorkload}
             onNavigate={handleNavigate}
           />
         )}

@@ -138,3 +138,61 @@ class RecommendationRequest(BaseModel):
     objective: str = Field(default="minimize_waiting")
     quantum: int = Field(default=2, ge=1)
     evaluate_held_out: bool = Field(default=True)
+
+
+class TraceUploadResponse(BaseModel):
+    id: int
+    name: str
+    filename: str
+    format: str
+    cleaned_jobs_count: int
+    cleaning_report: Dict[str, Any]
+    features: Dict[str, Any]
+    created_at: str
+
+
+class TraceListItem(BaseModel):
+    id: int
+    name: str
+    filename: str
+    format: str
+    cleaned_jobs_count: int
+    created_at: str
+
+
+class TraceSampleRequest(BaseModel):
+    method: str = Field(default="random", description="'random' or 'time_window'")
+    count: int = Field(default=20, ge=1, le=500)
+    scale_factor: float = Field(default=1.0, gt=0)
+    max_burst_tick: int = Field(default=100, ge=1)
+    window_start_tick: int = Field(default=0, ge=0)
+    window_duration_ticks: Optional[int] = Field(default=None)
+    seed: int = Field(default=42)
+    save_as_workload: bool = Field(default=False)
+    workload_name: Optional[str] = None
+
+
+class TraceSampleResponse(BaseModel):
+    trace_id: int
+    sampling_config: Dict[str, Any]
+    scaling_loss: Dict[str, Any]
+    process_count: int
+    processes: List[ProcessItem]
+    features: Dict[str, Any]
+    saved_workload_id: Optional[int] = None
+
+
+class TraceCompareSyntheticRequest(BaseModel):
+    seed: int = Field(default=42)
+    sampling_count: int = Field(default=25, ge=5, le=200)
+    scale_factor: float = Field(default=1.0, gt=0)
+
+
+class TraceCompareSyntheticResponse(BaseModel):
+    trace_id: int
+    trace_features: Dict[str, Any]
+    best_generator_params: Dict[str, Any]
+    best_composite_distance: float
+    comparison_stats: Dict[str, Any]
+    synthetic_processes: List[ProcessItem]
+
