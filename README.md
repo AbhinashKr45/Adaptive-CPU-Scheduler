@@ -24,7 +24,6 @@ This platform couples an **authoritative, discrete-event C99 scheduling engine**
 8. [Feature-Only Adaptive Recommender](#feature-only-adaptive-recommender)
 9. [Fairness & Starvation Metrics](#fairness--starvation-metrics)
 10. [Trace-Informed Workload Pipeline](#trace-informed-workload-pipeline)
-11. [License](#license)
 
 ---
 
@@ -252,8 +251,3 @@ Traditional recommender prototypes often leak simulation results by testing each
    $$\text{Regret} = M_{\text{chosen}} - M_{\text{oracle}} \ge 0$$
 3. **Calibrated Rules & Decision Trees**: Transparent rules provide clear explanations (e.g. detecting high burst coefficient of variation $CV_B \ge 0.457$ to recommend SRTF).
 
----
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
