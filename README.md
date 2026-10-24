@@ -24,8 +24,7 @@ This platform couples an **authoritative, discrete-event C99 scheduling engine**
 8. [Feature-Only Adaptive Recommender](#feature-only-adaptive-recommender)
 9. [Fairness & Starvation Metrics](#fairness--starvation-metrics)
 10. [Trace-Informed Workload Pipeline](#trace-informed-workload-pipeline)
-11. [In-Depth Documentation](#in-depth-documentation)
-12. [License](#license)
+11. [License](#license)
 
 ---
 
@@ -107,11 +106,6 @@ Adaptive-OS-Scheduling/
 │   ├── statistics.py             # Holm-Bonferroni, Cohen's d_z, Friedman test
 │   ├── traces/                   # SWF & CSV parsers, cleaners, scalers, KS tests
 │   └── run_final_experiments.py  # 30-seed authoritative benchmark script
-├── docs/                          # Comprehensive architectural and method guides
-│   ├── ARCHITECTURE.md           # System design & memory management
-│   ├── API.md                    # REST API catalog and request schemas
-│   ├── RESEARCH_METHOD.md        # Mathematical derivations and formulas
-│   └── DEMO.md                   # Step-by-step presentation script
 ├── frontend/                      # React 19 + TypeScript dashboard
 │   ├── src/components/           # Gantt, MetricsCards, ErrorBoundary, Navbar
 │   ├── src/pages/                # 9 research views + TraceLab + FinalResults
@@ -257,16 +251,6 @@ Traditional recommender prototypes often leak simulation results by testing each
 2. **Honest Regret Validation**: Validated on strictly disjoint held-out seeds ($3000..3199$). Evaluates the difference against the theoretical ex-post oracle:
    $$\text{Regret} = M_{\text{chosen}} - M_{\text{oracle}} \ge 0$$
 3. **Calibrated Rules & Decision Trees**: Transparent rules provide clear explanations (e.g. detecting high burst coefficient of variation $CV_B \ge 0.457$ to recommend SRTF).
-
----
-
-## In-Depth Documentation
-
-For detailed technical and research documentation, explore the `docs/` folder:
-- [System Architecture](docs/ARCHITECTURE.md): Deep dive into C99 memory management, subprocess bridge, and React design.
-- [REST API Reference](docs/API.md): Full OpenAPI endpoint reference with request/response schemas.
-- [Research Methodology](docs/RESEARCH_METHOD.md): Mathematical formulations for Jain's index, Gini, Holm-Bonferroni, and Wasserstein distance.
-- [Demonstration Script](docs/DEMO.md): Step-by-step walkthrough script for live demonstrations.
 
 ---
 

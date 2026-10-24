@@ -123,15 +123,6 @@ export const FinalResultsPage: React.FC<FinalResultsPageProps> = ({ onNavigate }
           >
             <BookOpen size={14} /> Full Academic REPORT.md
           </button>
-          {reportMarkdown && (
-            <button
-              className="btn btn-secondary"
-              onClick={() => downloadFile('REPORT.md', reportMarkdown, 'text/markdown')}
-              title="Download REPORT.md"
-            >
-              <Download size={14} /> REPORT.md
-            </button>
-          )}
           <button
             className="btn btn-secondary"
             onClick={() => downloadFile('experiments_results.json', JSON.stringify(data, null, 2), 'application/json')}
