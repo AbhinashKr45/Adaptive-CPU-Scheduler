@@ -365,6 +365,7 @@ def evaluate_adaptive_policy_on_held_out_seeds(
     results_adaptive = []
     results_oracle = []
     regrets = []
+    recommendations = []
     oracle_matches = 0
 
     for seed in held_out_seeds:
@@ -383,6 +384,7 @@ def evaluate_adaptive_policy_on_held_out_seeds(
         # 1. Feature-only recommendation (NO simulation)
         rec = recommend_scheduler(procs, objective=objective, quantum=rr_quantum, selector_mode=selector_mode)
         chosen_algo = rec["recommended_scheduler"]
+        recommendations.append(chosen_algo)
 
         # 2. Ex-post evaluation of all policies on this seed
         oracle_info = oracle_select(procs, objective=objective, quantum=rr_quantum)

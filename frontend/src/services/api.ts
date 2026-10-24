@@ -10,12 +10,20 @@ const API_BASE = (typeof window !== 'undefined' && window.location.port !== '800
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    let err = 'An error occurred';
+    let err = `HTTP ${res.status}`;
     try {
-      const data = await res.json();
-      err = data.detail || data.message || JSON.stringify(data);
+      const cloned = typeof res.clone === 'function' ? res.clone() : res;
+      try {
+        const data = await cloned.json();
+        err = data.detail || data.message || JSON.stringify(data);
+      } catch {
+        if (typeof res.text === 'function') {
+          const text = await res.text();
+          err = text || `HTTP ${res.status}`;
+        }
+      }
     } catch {
-      err = await res.text() || `HTTP ${res.status}`;
+      err = `HTTP ${res.status} ${res.statusText || ''}`.trim();
     }
     throw new Error(err);
   }
