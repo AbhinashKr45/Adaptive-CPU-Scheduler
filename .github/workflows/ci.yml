@@ -19,28 +19,12 @@ jobs:
 
       - name: Build C Engine with Strict Compiler Flags (-Wall -Wextra -Wpedantic -std=c99)
         run: |
-          gcc -Wall -Wextra -Wpedantic -std=c99 -Isrc \
-            src/core/process.c src/core/metrics.c src/core/simulation.c \
-            src/schedulers/fcfs.c src/schedulers/sjf.c src/schedulers/srtf.c \
-            src/schedulers/priority.c src/schedulers/round_robin.c \
-            main.c -o scheduler_cli
+          make all
           ./scheduler_cli --help
 
       - name: Compile and Run C Unit Tests
         run: |
-          mkdir -p tests/bin
-          gcc -Wall -Wextra -Wpedantic -std=c99 -Isrc \
-            src/core/process.c src/core/metrics.c src/core/simulation.c \
-            src/schedulers/fcfs.c src/schedulers/sjf.c src/schedulers/srtf.c \
-            src/schedulers/priority.c src/schedulers/round_robin.c \
-            tests/test_metrics.c -o tests/bin/test_metrics
-          gcc -Wall -Wextra -Wpedantic -std=c99 -Isrc \
-            src/core/process.c src/core/metrics.c src/core/simulation.c \
-            src/schedulers/fcfs.c src/schedulers/sjf.c src/schedulers/srtf.c \
-            src/schedulers/priority.c src/schedulers/round_robin.c \
-            tests/test_simulation.c -o tests/bin/test_simulation
-          ./tests/bin/test_metrics
-          ./tests/bin/test_simulation
+          make test
 
   python-backend-tests:
     name: Backend, Recommender, Traces & Integration
@@ -62,11 +46,8 @@ jobs:
 
       - name: Compile C engine binary
         run: |
-          gcc -Wall -Wextra -Wpedantic -std=c99 -Isrc \
-            src/core/process.c src/core/metrics.c src/core/simulation.c \
-            src/schedulers/fcfs.c src/schedulers/sjf.c src/schedulers/srtf.c \
-            src/schedulers/priority.c src/schedulers/round_robin.c \
-            main.c -o scheduler_cli
+          make all
+          ./scheduler_cli --help
 
       - name: Run Pytest Suite with Coverage
         run: pytest --cov=backend backend/tests
