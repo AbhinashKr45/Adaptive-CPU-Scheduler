@@ -9,6 +9,13 @@ WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 CLI_EXECUTABLE_NAME = "scheduler_cli.exe" if sys.platform == "win32" else "scheduler_cli"
 CLI_PATH = os.path.join(WORKSPACE_ROOT, CLI_EXECUTABLE_NAME)
 
+def is_available() -> bool:
+    """Returns True if the C engine binary exists or GCC compiler is present to compile it."""
+    if os.path.exists(CLI_PATH):
+        return True
+    return shutil.which("gcc") is not None
+
+
 def ensure_c_engine_compiled() -> str:
     """Ensures that the authoritative C scheduling engine is compiled and available."""
     if os.path.exists(CLI_PATH):

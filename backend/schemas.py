@@ -2,10 +2,10 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
 class ProcessItem(BaseModel):
-    pid: int = Field(..., ge=0, description="Process ID")
-    arrival_time: int = Field(..., ge=0, description="Arrival time (>= 0)")
-    burst_time: int = Field(..., gt=0, description="CPU burst length (> 0)")
-    priority: int = Field(default=1, description="Priority value (lower numerical = higher priority)")
+    pid: int = Field(..., ge=0, le=1000000, description="Process ID")
+    arrival_time: int = Field(..., ge=0, le=1000000, description="Arrival time (>= 0)")
+    burst_time: int = Field(..., gt=0, le=1000000, description="CPU burst length (> 0)")
+    priority: int = Field(default=1, ge=0, le=10000, description="Priority value (lower numerical = higher priority)")
 
 
 class ProcessResultItem(ProcessItem):
@@ -65,8 +65,8 @@ class SimulationRequest(BaseModel):
     workload_id: Optional[int] = None
     workload_name: Optional[str] = "Workload"
     algorithm: str = Field(..., description="FCFS, SJF, SRTF, PRIORITY, or RR")
-    quantum: int = Field(default=2, ge=1, description="Round Robin time quantum")
-    processes: List[ProcessItem] = Field(..., min_length=1)
+    quantum: int = Field(default=2, ge=1, le=1000, description="Round Robin time quantum")
+    processes: List[ProcessItem] = Field(..., min_length=1, max_length=500)
     observe_times: Optional[List[int]] = None
 
 
@@ -81,8 +81,8 @@ class SimulationResponse(BaseModel):
 
 
 class CompareRequest(BaseModel):
-    processes: List[ProcessItem] = Field(..., min_length=1)
-    quantum: int = Field(default=2, ge=1)
+    processes: List[ProcessItem] = Field(..., min_length=1, max_length=500)
+    quantum: int = Field(default=2, ge=1, le=1000)
     schedulers: Optional[List[str]] = ["FCFS", "SJF", "SRTF", "PRIORITY", "RR"]
     observe_times: Optional[List[int]] = None
 
@@ -93,23 +93,23 @@ class CompareResponse(BaseModel):
 
 
 class WorkloadGenerateRequest(BaseModel):
-    process_count: int = Field(default=10, ge=1, le=1000)
+    process_count: int = Field(default=10, ge=1, le=500)
     seed: int = Field(default=42)
     arrival_distribution: str = Field(default="uniform")
     burst_distribution: str = Field(default="normal")
-    mean_burst: float = Field(default=10.0, gt=0)
-    burst_std: float = Field(default=4.0, ge=0)
+    mean_burst: float = Field(default=10.0, gt=0, le=1000.0)
+    burst_std: float = Field(default=4.0, ge=0, le=1000.0)
     skew_level: str = Field(default="medium")
-    max_arrival: int = Field(default=20, ge=0)
+    max_arrival: int = Field(default=20, ge=0, le=10000)
     priority_distribution: str = Field(default="uniform")
-    min_priority: int = Field(default=1)
-    max_priority: int = Field(default=5)
+    min_priority: int = Field(default=1, ge=0)
+    max_priority: int = Field(default=5, ge=0)
 
 
 class WorkloadCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     description: Optional[str] = None
-    processes: List[ProcessItem] = Field(..., min_length=1)
+    processes: List[ProcessItem] = Field(..., min_length=1, max_length=500)
     generator_config: Optional[Dict[str, Any]] = None
 
 
@@ -128,15 +128,15 @@ class ExperimentCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     description: Optional[str] = None
     schedulers: List[str] = Field(default=["FCFS", "SJF", "SRTF", "PRIORITY", "RR"])
-    seeds: List[int] = Field(default=[42, 43, 44, 45, 46])
+    seeds: List[int] = Field(default=[42, 43, 44, 45, 46], max_length=100)
     workload_config: Dict[str, Any] = Field(default_factory=dict)
-    rr_quantum: int = Field(default=2, ge=1)
+    rr_quantum: int = Field(default=2, ge=1, le=1000)
 
 
 class RecommendationRequest(BaseModel):
-    processes: List[ProcessItem] = Field(..., min_length=1)
+    processes: List[ProcessItem] = Field(..., min_length=1, max_length=500)
     objective: str = Field(default="minimize_waiting")
-    quantum: int = Field(default=2, ge=1)
+    quantum: int = Field(default=2, ge=1, le=1000)
     selector_mode: str = Field(default="rule_based", description="'rule_based' or 'decision_tree'")
     evaluate_held_out: bool = Field(default=True)
 

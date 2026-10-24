@@ -5,9 +5,11 @@ import csv
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, Response, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+import shutil
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, text
 
+from backend import c_bridge
 from backend.database import get_db, init_db
 from backend.models import Workload, SimulationRun, Experiment, RecommendationRecord, TraceRecord
 from backend.schemas import (
@@ -49,11 +51,28 @@ app.add_middleware(
 
 
 @app.get("/api/v1/health")
-def health_check():
+def health_check(db: Session = Depends(get_db)):
+    db_ok = False
+    try:
+        db.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        db_ok = False
+
+    gcc_path = shutil.which("gcc")
+    c_ok = c_bridge.is_available()
+    c_compiled = os.path.exists(c_bridge.CLI_PATH)
+
+    status = "healthy" if (db_ok and c_ok) else "degraded"
+
     return {
-        "status": "healthy",
+        "status": status,
         "service": "Adaptive OS Scheduling API",
-        "c_engine": "authoritative"
+        "c_engine": "authoritative",
+        "database_connected": db_ok,
+        "c_bridge_available": c_ok,
+        "c_engine_compiled": c_compiled,
+        "gcc_available": gcc_path is not None
     }
 
 
@@ -585,6 +604,7 @@ async def upload_trace(
     content = ""
     filename = "uploaded_trace.csv"
 
+    MAX_TRACE_SIZE = 10 * 1024 * 1024  # 10 MB limit
     if sample_bundled in ["swf", "csv"]:
         ext = sample_bundled
         sample_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "traces", f"sample_workload.{ext}")
@@ -599,8 +619,12 @@ async def upload_trace(
     elif file is not None:
         filename = file.filename or "uploaded_trace.csv"
         raw_bytes = await file.read()
+        if len(raw_bytes) > MAX_TRACE_SIZE:
+            raise HTTPException(status_code=413, detail=f"Trace file exceeds 10MB limit (size: {len(raw_bytes)} bytes)")
         content = raw_bytes.decode("utf-8", errors="replace")
     elif raw_text:
+        if len(raw_text.encode("utf-8")) > MAX_TRACE_SIZE:
+            raise HTTPException(status_code=413, detail="Pasted trace content exceeds 10MB limit")
         content = raw_text
         filename = "pasted_trace.csv"
     else:
@@ -805,5 +829,13 @@ def get_final_report():
         raise HTTPException(status_code=404, detail="Research report not found. Run backend/run_final_experiments.py first.")
     with open(report_path, "r", encoding="utf-8") as f:
         return {"report_markdown": f.read()}
+
+
+# Mount built frontend assets if present in production
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+if os.path.exists(frontend_dist):
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static")
+
 
 
