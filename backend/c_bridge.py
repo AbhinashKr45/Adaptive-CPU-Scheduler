@@ -19,6 +19,11 @@ def is_available() -> bool:
 def ensure_c_engine_compiled() -> str:
     """Ensures that the authoritative C scheduling engine is compiled and available."""
     if os.path.exists(CLI_PATH):
+        if sys.platform != "win32":
+            try:
+                os.chmod(CLI_PATH, 0o755)
+            except Exception:
+                pass
         return CLI_PATH
 
     # Check if gcc is available

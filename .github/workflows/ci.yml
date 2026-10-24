@@ -29,6 +29,8 @@ jobs:
   python-backend-tests:
     name: Backend, Recommender, Traces & Integration
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -47,10 +49,11 @@ jobs:
       - name: Compile C engine binary
         run: |
           make all
+          chmod +x scheduler_cli || true
           ./scheduler_cli --help
 
       - name: Run Pytest Suite with Coverage
-        run: pytest --cov=backend backend/tests
+        run: python -m pytest --cov=backend backend/tests
 
       - name: Run End-to-End Scenario Verification
         run: python test_e2e_scenario.py
