@@ -23,6 +23,12 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 export const api = {
+  // System Health
+  async getHealth(): Promise<{ status: string; c_engine: string }> {
+    const res = await fetch(`${API_BASE}/health`);
+    return handleResponse<{ status: string; c_engine: string }>(res);
+  },
+
   // Overview
   async getOverview(): Promise<OverviewData> {
     const res = await fetch(`${API_BASE}/overview`);

@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import { ProcessItem, CompareResponse, SimulationResponse, ObservationFairnessItem } from '../types';
 import {
   Scale, Clock, RefreshCw, Info, CheckCircle,
-  AlertCircle, ArrowRight, TrendingUp, Users, Play, HelpCircle
+  AlertCircle, ArrowRight, TrendingUp, Users
 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid
@@ -11,12 +11,12 @@ import {
 
 interface FairnessLaboratoryProps {
   currentProcesses: ProcessItem[];
-  onNavigate: (tab: string) => void;
+  onNavigate?: (tab: string) => void;
 }
 
 export const FairnessLaboratoryPage: React.FC<FairnessLaboratoryProps> = ({
   currentProcesses,
-  onNavigate
+  onNavigate: _onNavigate
 }) => {
   const [data, setData] = useState<CompareResponse | null>(null);
   const [quantum, setQuantum] = useState<number>(2);

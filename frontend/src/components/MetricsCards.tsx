@@ -76,8 +76,8 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ metrics }) => {
       {/* Starvation Ratio & Count */}
       <div className="stat-card">
         <div className="stat-label">Starvation Indicators</div>
-        <div className="stat-value" style={{ color: (metrics.starvation_count > 0 || metrics.starvation_ratio > 3.0) ? 'var(--red-600)' : 'var(--navy-900)' }}>
-          {metrics.starvation_ratio.toFixed(2)}x
+        <div className="stat-value" style={{ color: (metrics.starvation_count > 0 || (metrics.starvation_ratio ?? 0) > 3.0) ? 'var(--red-600)' : 'var(--navy-900)' }}>
+          {metrics.starvation_ratio !== undefined ? `${metrics.starvation_ratio.toFixed(2)}x` : `${metrics.starvation_count ?? 0} starved`}
         </div>
         <div className="stat-sub">
           Starved procs (&gt;3x avg): <strong>{metrics.starvation_count ?? 0}</strong>
