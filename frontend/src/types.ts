@@ -197,18 +197,20 @@ export interface RecommendationResponse {
     description: string;
   } | null;
   held_out_evaluation?: {
-    target_metric: string;
+    target_metric?: string;
     objective: string;
-    objective_definition: string;
-    held_out_seed_count: number;
+    objective_definition?: string;
+    held_out_seed_count?: number;
+    held_out_seeds_count?: number;
     adaptive_mean: number;
-    adaptive_std: number;
+    adaptive_std?: number;
     oracle_mean: number;
-    fixed_policies_mean: Record<string, number>;
-    recommendations_frequency: Record<string, number>;
+    fixed_policies_mean?: Record<string, number>;
+    recommendations_frequency?: Record<string, number>;
     mean_regret: number;
-    display_note: string;
-    oracle_note: string;
+    display_note?: string;
+    oracle_note?: string;
+    honesty_note?: string;
   };
 }
 

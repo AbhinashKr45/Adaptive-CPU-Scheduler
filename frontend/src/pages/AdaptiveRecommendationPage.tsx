@@ -225,7 +225,7 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
 
             {/* Objective Definition */}
             <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--surface-secondary)', borderRadius: 8, fontSize: '0.82rem', color: 'var(--navy-600)' }}>
-              <strong>Optimization Objective:</strong> {rec.objective_definition}
+              <strong>Optimization Objective:</strong> {rec.objective_definition || rec.objective_label || rec.objective}
             </div>
 
             {/* Trade-Offs & Alternatives */}
@@ -235,8 +235,8 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
                   Expected Trade-Offs & Inherent Costs:
                 </div>
                 <ul style={{ paddingLeft: 18, fontSize: '0.82rem', color: 'var(--navy-600)', lineHeight: 1.6 }}>
-                  {rec.trade_offs.map((to, i) => (
-                    <li key={i}>{to}</li>
+                  {(rec.trade_offs || []).map((to: any, i) => (
+                    <li key={i}>{typeof to === 'string' ? to : `${to.aspect || 'Note'}: ${to.detail || ''}`}</li>
                   ))}
                 </ul>
               </div>
@@ -246,7 +246,7 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
                   Ranked Policy Alternatives:
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {rec.alternatives.map((alt, i) => (
+                  {(rec.alternatives || ['FCFS', 'SJF', 'SRTF', 'PRIORITY', 'RR'].filter(s => s !== rec.recommended_scheduler)).map((alt, i) => (
                     <span key={i} className="badge badge-gray" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
                       #{i + 1}: {alt}
                     </span>
@@ -481,7 +481,7 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
                   <thead>
                     <tr>
                       <th>Policy Strategy</th>
-                      <th>Mean Score ({rec.held_out_evaluation.target_metric})</th>
+                      <th>Mean Score ({rec.held_out_evaluation.target_metric || rec.held_out_evaluation.objective || 'Objective'})</th>
                       <th>Performance</th>
                       <th>Status</th>
                     </tr>
@@ -489,21 +489,21 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
                   <tbody>
                     <tr style={{ background: 'var(--orange-50)' }}>
                       <td><strong>Adaptive Recommendation</strong></td>
-                      <td><strong>{rec.held_out_evaluation.adaptive_mean.toFixed(3)}</strong> ± {rec.held_out_evaluation.adaptive_std.toFixed(3)}</td>
+                      <td><strong>{rec.held_out_evaluation.adaptive_mean?.toFixed(3) ?? 'N/A'}</strong> ± {(rec.held_out_evaluation.adaptive_std ?? 0).toFixed(3)}</td>
                       <td>Selected dynamically per seed</td>
                       <td><span className="badge badge-orange">Adaptive</span></td>
                     </tr>
-                    {Object.entries(rec.held_out_evaluation.fixed_policies_mean).map(([pol, val]) => (
+                    {rec.held_out_evaluation.fixed_policies_mean && Object.entries(rec.held_out_evaluation.fixed_policies_mean).map(([pol, val]) => (
                       <tr key={pol}>
                         <td>Fixed Policy: {pol}</td>
-                        <td>{(val as number).toFixed(3)}</td>
+                        <td>{(val as number)?.toFixed(3)}</td>
                         <td>Static execution on all seeds</td>
                         <td><span className="badge badge-gray">Fixed</span></td>
                       </tr>
                     ))}
                     <tr style={{ background: 'var(--surface-secondary)' }}>
                       <td><strong>Oracle Baseline (ex-post)</strong></td>
-                      <td><strong>{rec.held_out_evaluation.oracle_mean.toFixed(3)}</strong></td>
+                      <td><strong>{rec.held_out_evaluation.oracle_mean?.toFixed(3) ?? 'N/A'}</strong></td>
                       <td>Theoretical best ex-post choice per seed</td>
                       <td><span className="badge badge-purple">Theoretical Oracle</span></td>
                     </tr>
@@ -515,22 +515,22 @@ export const AdaptiveRecommendationPage: React.FC<AdaptiveRecommendationProps> =
               <div style={{ marginTop: 12, display: 'flex', gap: 20, alignItems: 'center', padding: '8px 12px', background: 'var(--surface-secondary)', borderRadius: 8, fontSize: '0.82rem' }}>
                 <div>
                   <strong>Mean Regret vs Oracle:</strong>{' '}
-                  <span style={{ fontWeight: 700, color: rec.held_out_evaluation.mean_regret < 0.5 ? 'var(--green-600)' : 'var(--red-600)' }}>
-                    {rec.held_out_evaluation.mean_regret.toFixed(4)}
+                  <span style={{ fontWeight: 700, color: (rec.held_out_evaluation.mean_regret ?? 0) < 0.5 ? 'var(--green-600)' : 'var(--red-600)' }}>
+                    {rec.held_out_evaluation.mean_regret !== undefined ? rec.held_out_evaluation.mean_regret.toFixed(4) : 'N/A'}
                   </span>
                   <span style={{ color: 'var(--navy-500)', marginLeft: 8 }}>
                     (lower = closer to theoretical optimal)
                   </span>
                 </div>
                 <div style={{ color: 'var(--navy-500)' }}>
-                  Selections: {Object.entries(rec.held_out_evaluation.recommendations_frequency)
+                  Selections: {rec.held_out_evaluation.recommendations_frequency ? Object.entries(rec.held_out_evaluation.recommendations_frequency)
                     .map(([k, v]) => `${k}: ${v}`)
-                    .join(', ')}
+                    .join(', ') : 'N/A'}
                 </div>
               </div>
 
               <div style={{ fontSize: '0.75rem', color: 'var(--navy-500)', marginTop: 8 }}>
-                * {rec.held_out_evaluation.oracle_note}
+                * {rec.held_out_evaluation.oracle_note || rec.held_out_evaluation.honesty_note || rec.held_out_evaluation.display_note || ''}
               </div>
             </div>
           )}

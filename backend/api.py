@@ -359,6 +359,8 @@ def get_recommendation(req: RecommendationRequest, db: Session = Depends(get_db)
         "oracle_gap": round(max(0.0, oracle_res["oracle_score"] - oracle_res["scores"].get(rec["recommended_scheduler"], 0.0)), 4),
         "all_scores": oracle_res["scores"]
     }
+    rec["scores"] = oracle_res["scores"]
+    rec["all_metrics"] = oracle_res["metrics"]
 
     # Optional held-out evaluation across disjoint test seeds
     held_out = None
