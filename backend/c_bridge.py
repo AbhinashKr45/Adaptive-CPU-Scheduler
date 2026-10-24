@@ -40,7 +40,8 @@ def ensure_c_engine_compiled() -> str:
         os.path.join(WORKSPACE_ROOT, "src", "schedulers", "priority.c"),
         os.path.join(WORKSPACE_ROOT, "src", "schedulers", "round_robin.c"),
         os.path.join(WORKSPACE_ROOT, "main.c"),
-        "-o", CLI_PATH
+        "-o", CLI_PATH,
+        "-lm"
     ]
 
     res = subprocess.run(compile_cmd, cwd=WORKSPACE_ROOT, capture_output=True, text=True)

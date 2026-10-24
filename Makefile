@@ -1,5 +1,6 @@
 CC ?= gcc
 CFLAGS = -Wall -Wextra -Wpedantic -std=c99 -Isrc
+LDFLAGS ?= -lm
 
 CORE_SRCS = src/core/process.c src/core/metrics.c src/core/simulation.c
 SCHED_SRCS = src/schedulers/fcfs.c src/schedulers/sjf.c src/schedulers/srtf.c src/schedulers/priority.c src/schedulers/round_robin.c
@@ -38,14 +39,14 @@ TEST_TARGETS := $(addsuffix $(EXE_EXT), $(TEST_NAMES))
 all: $(CLI_TARGET) $(SHLIB_TARGET)
 
 $(CLI_TARGET): $(ALL_SRCS) main.c
-	$(CC) $(CFLAGS) $(ALL_SRCS) main.c -o $(CLI_TARGET)
+	$(CC) $(CFLAGS) $(ALL_SRCS) main.c -o $(CLI_TARGET) $(LDFLAGS)
 
 $(SHLIB_TARGET): $(ALL_SRCS)
-	$(CC) $(SHLIB_FLAGS) $(CFLAGS) $(ALL_SRCS) -o $(SHLIB_TARGET)
+	$(CC) $(SHLIB_FLAGS) $(CFLAGS) $(ALL_SRCS) -o $(SHLIB_TARGET) $(LDFLAGS)
 
 # Test binaries pattern
 %$(EXE_EXT): tests/%.c $(ALL_SRCS)
-	$(CC) $(CFLAGS) $(ALL_SRCS) $< -o $@
+	$(CC) $(CFLAGS) $(ALL_SRCS) $< -o $@ $(LDFLAGS)
 
 test: $(TEST_TARGETS)
 	./test_fcfs$(EXE_EXT)

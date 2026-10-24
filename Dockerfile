@@ -29,7 +29,7 @@ COPY src/ ./src/
 COPY main.c Makefile ./
 
 # Compile authoritative C scheduling engine and verify CLI builds clean
-RUN make all && ./scheduler_cli --help > /dev/null 2>&1
+RUN make all && ./scheduler_cli --help
 
 # Copy backend code, data, and benchmark results
 COPY backend/ ./backend/
@@ -46,4 +46,4 @@ ENV PORT=8000
 ENV HOST=0.0.0.0
 ENV PYTHONUNBUFFERED=1
 
-CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn backend.api:app --host 0.0.0.0 --port ${PORT:-8000}"]
